@@ -1,31 +1,37 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Assistant of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
 ** GNU Lesser General Public License Usage
 ** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** General Public License version 3 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL3 included in the
+** packaging of this file. Please review the following information to
+** ensure the GNU Lesser General Public License version 3 requirements
+** will be met: https://www.gnu.org/licenses/lgpl-3.0.html.
 **
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 2.0 or (at your option) the GNU General
+** Public license version 3 or any later version approved by the KDE Free
+** Qt Foundation. The licenses are as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL2 and LICENSE.GPL3
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-2.0.html and
+** https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -39,6 +45,7 @@
 #include <QtCore/QStack>
 #include <QtCore/QMap>
 #include <QtCore/QRegExp>
+#include <QtCore/QTextStream>
 #include <QtCore/QUrl>
 #include <QtCore/QVariant>
 #include <QtCore/QXmlStreamReader>
@@ -87,18 +94,20 @@ void QHelpProjectDataPrivate::readData(const QByteArray &contents)
         readNext();
         if (isStartElement()) {
             if (name() == QLatin1String("QtHelpProject")
-                && attributes().value(QLatin1String("version")) == QLatin1String("1.0"))
+                    && attributes().value(QLatin1String("version"))
+                    == QLatin1String("1.0")) {
                 readProject();
-            else
+            } else {
                 raiseError(QCoreApplication::translate("QHelpProject",
                                "Unknown token. Expected \"QtHelpProject\"."));
+            }
         }
     }
 
     if (hasError()) {
         raiseError(QCoreApplication::translate("QHelpProject",
-                       "Error in line %1: %2").arg(lineNumber())
-            .arg(errorString()));
+                   "Error in line %1: %2").arg(lineNumber())
+                   .arg(errorString()));
     }
 }
 
@@ -192,8 +201,8 @@ void QHelpProjectDataPrivate::readTOC()
         readNext();
         if (isStartElement()) {
             if (name() == QLatin1String("section")) {
-                QString title = attributes().value(QLatin1String("title")).toString();
-                QString ref = attributes().value(QLatin1String("ref")).toString();
+                const QString &title = attributes().value(QLatin1String("title")).toString();
+                const QString &ref = attributes().value(QLatin1String("ref")).toString();
                 if (contentStack.isEmpty()) {
                     itm = new QHelpDataContentItem(0, title, ref);
                     filterSectionList.last().addContent(itm);
@@ -209,12 +218,24 @@ void QHelpProjectDataPrivate::readTOC()
                 contentStack.pop();
                 continue;
             } else if (name() == QLatin1String("toc") && contentStack.isEmpty()) {
-                break;
+                return;
             } else {
                 raiseUnknownTokenError();
             }
         }
     }
+}
+
+static inline QString msgMissingAttribute(const QString &fileName, qint64 lineNumber, const QString &name)
+{
+    QString result;
+    QTextStream str(&result);
+    str << QDir::toNativeSeparators(fileName) << ':' << lineNumber
+        << ": Missing attribute in <keyword";
+    if (!name.isEmpty())
+        str << " name=\"" << name << '"';
+    str << ">.";
+    return result;
 }
 
 void QHelpProjectDataPrivate::readKeywords()
@@ -223,17 +244,15 @@ void QHelpProjectDataPrivate::readKeywords()
         readNext();
         if (isStartElement()) {
             if (name() == QLatin1String("keyword")) {
-                if (attributes().value(QLatin1String("ref")).toString().isEmpty()
-                    || (attributes().value(QLatin1String("name")).toString().isEmpty()
-                    && attributes().value(QLatin1String("id")).toString().isEmpty())) {
-                    qWarning("Missing attribute in keyword at line %d.", (int)lineNumber());
+                const QString &refAttribute = attributes().value(QStringLiteral("ref")).toString();
+                const QString &nameAttribute = attributes().value(QStringLiteral("name")).toString();
+                const QString &idAttribute = attributes().value(QStringLiteral("id")).toString();
+                if (refAttribute.isEmpty() || (nameAttribute.isEmpty() && idAttribute.isEmpty())) {
+                    qWarning("%s", qPrintable(msgMissingAttribute(fileName, lineNumber(), nameAttribute)));
                     continue;
                 }
                 filterSectionList.last()
-                    .addIndex(QHelpDataIndexItem(attributes().
-                                  value(QLatin1String("name")).toString(),
-                              attributes().value(QLatin1String("id")).toString(),
-                              attributes().value(QLatin1String("ref")).toString()));
+                    .addIndex(QHelpDataIndexItem(nameAttribute, idAttribute, refAttribute));
             } else {
                 raiseUnknownTokenError();
             }
@@ -241,7 +260,7 @@ void QHelpProjectDataPrivate::readKeywords()
             if (name() == QLatin1String("keyword"))
                 continue;
             else if (name() == QLatin1String("keywords"))
-                break;
+                return;
             else
                 raiseUnknownTokenError();
         }
@@ -261,7 +280,7 @@ void QHelpProjectDataPrivate::readFiles()
             if (name() == QLatin1String("file"))
                 continue;
             else if (name() == QLatin1String("files"))
-                break;
+                return;
             else
                 raiseUnknownTokenError();
         }
@@ -281,15 +300,15 @@ void QHelpProjectDataPrivate::addMatchingFiles(const QString &pattern)
         return;
     }
 
-    QFileInfo fileInfo(rootPath + QLatin1Char('/') + pattern);
+    const QFileInfo fileInfo(rootPath + QLatin1Char('/') + pattern);
     const QDir &dir = fileInfo.dir();
     const QString &path = dir.canonicalPath();
 
     // QDir::entryList() is expensive, so we cache the results.
-    QMap<QString, QStringList>::ConstIterator it = dirEntriesCache.find(path);
-    const QStringList &entries = it != dirEntriesCache.constEnd() ?
+    const auto &it = dirEntriesCache.constFind(path);
+    const QStringList &entries = it != dirEntriesCache.cend() ?
                                  it.value() : dir.entryList(QDir::Files);
-    if (it == dirEntriesCache.constEnd())
+    if (it == dirEntriesCache.cend())
         dirEntriesCache.insert(path, entries);
 
     bool matchFound = false;
@@ -298,8 +317,8 @@ void QHelpProjectDataPrivate::addMatchingFiles(const QString &pattern)
 #else
     Qt::CaseSensitivity cs = Qt::CaseSensitive;
 #endif
-    QRegExp regExp(fileInfo.fileName(), cs, QRegExp::Wildcard);
-    foreach (const QString &file, entries) {
+    const QRegExp regExp(fileInfo.fileName(), cs, QRegExp::Wildcard);
+    for (const QString &file : entries) {
         if (regExp.exactMatch(file)) {
             matchFound = true;
             filterSectionList.last().
@@ -319,7 +338,7 @@ bool QHelpProjectDataPrivate::hasValidSyntax(const QString &nameSpace,
     QUrl url;
     const QLatin1String scheme("qthelp");
     url.setScheme(scheme);
-    const QString canonicalNamespace = nameSpace.toLower();
+    const QString &canonicalNamespace = nameSpace.toLower();
     url.setHost(canonicalNamespace);
     url.setPath(slash + vFolder);
 

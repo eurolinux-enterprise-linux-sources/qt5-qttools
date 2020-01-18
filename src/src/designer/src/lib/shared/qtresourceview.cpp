@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -63,6 +58,8 @@
 #include <QtGui/QDrag>
 #include <QtCore/QMimeData>
 #include <QtXml/QDomDocument>
+
+#include <algorithm>
 
 QT_BEGIN_NAMESPACE
 
@@ -265,20 +262,14 @@ void QtResourceViewPrivate::slotFilterChanged(const QString &pattern)
 
 void QtResourceViewPrivate::storeExpansionState()
 {
-    QMapIterator<QString, QTreeWidgetItem *> it(m_pathToItem);
-    while (it.hasNext()) {
-        it.next();
-        m_expansionState[it.key()] = it.value()->isExpanded();
-    }
+    for (auto it = m_pathToItem.cbegin(), end = m_pathToItem.cend(); it != end; ++it)
+        m_expansionState.insert(it.key(), it.value()->isExpanded());
 }
 
 void QtResourceViewPrivate::applyExpansionState()
 {
-    QMapIterator<QString, QTreeWidgetItem *> it(m_pathToItem);
-    while (it.hasNext()) {
-        it.next();
+    for (auto it = m_pathToItem.cbegin(), end = m_pathToItem.cend(); it != end; ++it)
         it.value()->setExpanded(m_expansionState.value(it.key(), true));
-    }
 }
 
 QPixmap QtResourceViewPrivate::makeThumbnail(const QPixmap &pix) const
@@ -380,10 +371,8 @@ void QtResourceViewPrivate::createPaths()
     const QString root(QStringLiteral(":/"));
 
     QMap<QString, QString> contents = m_resourceModel->contents();
-    QMapIterator<QString, QString> itContents(contents);
-    while (itContents.hasNext()) {
-        const QString filePath = itContents.next().key();
-        const QFileInfo fi(filePath);
+    for (auto it = contents.cbegin(), end = contents.cend(); it != end; ++it) {
+        const QFileInfo fi(it.key());
         QString dirPath = fi.absolutePath();
         m_pathToContents[dirPath].append(fi.fileName());
         while (!m_pathToParentPath.contains(dirPath) && dirPath != root) { // create all parent paths
@@ -401,10 +390,9 @@ void QtResourceViewPrivate::createPaths()
         QPair<QString, QTreeWidgetItem *> pathToParentItem = pathToParentItemQueue.dequeue();
         const QString path = pathToParentItem.first;
         QTreeWidgetItem *item = createPath(path, pathToParentItem.second);
-        QStringList subPaths = m_pathToSubPaths.value(path);
-        QStringListIterator itSubPaths(subPaths);
-        while (itSubPaths.hasNext())
-            pathToParentItemQueue.enqueue(qMakePair(itSubPaths.next(), item));
+        const QStringList subPaths = m_pathToSubPaths.value(path);
+        for (const QString &subPath : subPaths)
+            pathToParentItemQueue.enqueue(qMakePair(subPath, item));
     }
 }
 
@@ -427,16 +415,13 @@ void QtResourceViewPrivate::filterOutResources()
     while (!pathQueue.isEmpty()) {
         const QString path = pathQueue.dequeue();
 
-        QStringList fileNames = m_pathToContents.value(path);
-        QStringListIterator it(fileNames);
         bool hasContents = matchAll;
         if (!matchAll) { // the case filter is not empty - we check if the path contains anything
-            while (it.hasNext()) {
-                QString fileName = it.next();
-                hasContents = fileName.contains(m_filterPattern, Qt::CaseInsensitive);
-                if (hasContents) // the path contains at least one resource which matches the filter
-                    break;
-            }
+            // the path contains at least one resource which matches the filter
+            const QStringList fileNames = m_pathToContents.value(path);
+            hasContents =
+                std::any_of(fileNames.cbegin(), fileNames.cend(),
+                            [this] (const QString &f) { return f.contains(this->m_filterPattern, Qt::CaseInsensitive); });
         }
 
         pathToMatchingContents[path] = hasContents;
@@ -453,10 +438,9 @@ void QtResourceViewPrivate::filterOutResources()
             }
         }
 
-        QStringList subPaths = m_pathToSubPaths.value(path); // we do the same for children paths
-        QStringListIterator itSubPaths(subPaths);
-        while (itSubPaths.hasNext())
-            pathQueue.enqueue(itSubPaths.next());
+        const QStringList subPaths = m_pathToSubPaths.value(path); // we do the same for children paths
+        for (const QString &subPath : subPaths)
+            pathQueue.enqueue(subPath);
     }
 
     // we setup here new path and resource to be activated
@@ -488,9 +472,8 @@ void QtResourceViewPrivate::filterOutResources()
         QFileInfo fi(currentResource);
         if (!fi.fileName().contains(m_filterPattern, Qt::CaseInsensitive)) { // the case when the current resource is filtered out
             const QStringList fileNames = m_pathToContents.value(newCurrentPath);
-            QStringListIterator it(fileNames);
-            while (it.hasNext()) { // we try to select the first matching resource from the newCurrentPath
-                QString fileName = it.next();
+            // we try to select the first matching resource from the newCurrentPath
+            for (const QString &fileName : fileNames) {
                 if (fileName.contains(m_filterPattern, Qt::CaseInsensitive)) {
                     QDir dirPath(newCurrentPath);
                     currentResource = dirPath.absoluteFilePath(fileName); // the new resource inside newCurrentPath will be activated
@@ -512,11 +495,9 @@ void QtResourceViewPrivate::filterOutResources()
         m_listWidget->scrollToItem(currentResourceItem);
     }
 
-    QMapIterator<QString, bool> it(pathToVisible); // hide all paths filtered out
-    while (it.hasNext()) {
-        const QString path = it.next().key();
-        QTreeWidgetItem *item = m_pathToItem.value(path);
-        if (item)
+    // hide all paths filtered out
+    for (auto it = pathToVisible.cbegin(), end = pathToVisible.cend(); it != end; ++it) {
+        if (QTreeWidgetItem *item = m_pathToItem.value(it.key()))
             item->setHidden(!it.value());
     }
 }
@@ -547,10 +528,8 @@ void QtResourceViewPrivate::createResources(const QString &path)
     const bool matchAll = m_filterPattern.isEmpty();
 
     QDir dir(path);
-    QStringList fileNames = m_pathToContents.value(path);
-    QStringListIterator it(fileNames);
-    while (it.hasNext()) {
-        QString fileName = it.next();
+    const QStringList fileNames = m_pathToContents.value(path);
+    for (const QString &fileName : fileNames) {
         const bool showProperty = matchAll || fileName.contains(m_filterPattern, Qt::CaseInsensitive);
         if (showProperty) {
             QString filePath = dir.absoluteFilePath(fileName);
@@ -862,9 +841,9 @@ QtResourceViewDialog::QtResourceViewDialog(QDesignerFormEditorInterface *core, Q
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(d_ptr->m_view);
     layout->addWidget(d_ptr->m_box);
-    connect(d_ptr->m_box, SIGNAL(accepted()), this, SLOT(accept()));
-    connect(d_ptr->m_box, SIGNAL(rejected()), this, SLOT(reject()));
-    connect(d_ptr->m_view, SIGNAL(resourceActivated(QString)), this, SLOT(accept()));
+    connect(d_ptr->m_box, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(d_ptr->m_box, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    connect(d_ptr->m_view, &QtResourceView::resourceActivated, this, &QDialog::accept);
     connect(d_ptr->m_view, SIGNAL(resourceSelected(QString)), this, SLOT(slotResourceSelected(QString)));
     d_ptr->setOkButtonEnabled(false);
     d_ptr->m_view->setResourceModel(core->resourceModel());

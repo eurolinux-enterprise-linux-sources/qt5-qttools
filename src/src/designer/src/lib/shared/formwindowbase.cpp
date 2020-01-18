@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -52,6 +47,7 @@
 
 #include <QtCore/qdebug.h>
 #include <QtCore/QList>
+#include <QtCore/QSet>
 #include <QtCore/QTimer>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QListWidget>
@@ -117,6 +113,15 @@ FormWindowBase::FormWindowBase(QDesignerFormEditorInterface *core, QWidget *pare
 
 FormWindowBase::~FormWindowBase()
 {
+    QSet<QDesignerPropertySheet *> sheets = m_d->m_reloadableResources.keys().toSet();
+    sheets |= m_d->m_reloadablePropertySheets.keys().toSet();
+
+    m_d->m_reloadableResources.clear();
+    m_d->m_reloadablePropertySheets.clear();
+
+    for (QDesignerPropertySheet *sheet : sheets)
+        disconnectSheet(sheet);
+
     delete m_d;
 }
 
@@ -142,14 +147,17 @@ void FormWindowBase::setResourceSet(QtResourceSet *resourceSet)
 
 void FormWindowBase::addReloadableProperty(QDesignerPropertySheet *sheet, int index)
 {
+    connectSheet(sheet);
     m_d->m_reloadableResources[sheet][index] = true;
 }
 
 void FormWindowBase::removeReloadableProperty(QDesignerPropertySheet *sheet, int index)
 {
     m_d->m_reloadableResources[sheet].remove(index);
-    if (m_d->m_reloadableResources[sheet].count() == 0)
+    if (!m_d->m_reloadableResources[sheet].count()) {
         m_d->m_reloadableResources.remove(sheet);
+        disconnectSheet(sheet);
+    }
 }
 
 void FormWindowBase::addReloadablePropertySheet(QDesignerPropertySheet *sheet, QObject *object)
@@ -157,13 +165,53 @@ void FormWindowBase::addReloadablePropertySheet(QDesignerPropertySheet *sheet, Q
     if (qobject_cast<QTreeWidget *>(object) ||
             qobject_cast<QTableWidget *>(object) ||
             qobject_cast<QListWidget *>(object) ||
-            qobject_cast<QComboBox *>(object))
+            qobject_cast<QComboBox *>(object)) {
+        connectSheet(sheet);
         m_d->m_reloadablePropertySheets[sheet] = object;
+    }
 }
 
-void FormWindowBase::removeReloadablePropertySheet(QDesignerPropertySheet *sheet)
+void FormWindowBase::connectSheet(QDesignerPropertySheet *sheet)
 {
-    m_d->m_reloadablePropertySheets.remove(sheet);
+    if (m_d->m_reloadableResources.contains(sheet)
+            || m_d->m_reloadablePropertySheets.contains(sheet)) {
+        // already connected
+        return;
+    }
+    connect(sheet, &QObject::destroyed, this, &FormWindowBase::sheetDestroyed);
+}
+
+void FormWindowBase::disconnectSheet(QDesignerPropertySheet *sheet)
+{
+    if (m_d->m_reloadableResources.contains(sheet)
+            || m_d->m_reloadablePropertySheets.contains(sheet)) {
+        // still need to be connected
+        return;
+    }
+    disconnect(sheet, &QObject::destroyed, this, &FormWindowBase::sheetDestroyed);
+}
+
+void FormWindowBase::sheetDestroyed(QObject *object)
+{
+    // qobject_cast<QDesignerPropertySheet *>(object)
+    // will fail since the destructor of QDesignerPropertySheet
+    // has already finished
+
+    for (auto it = m_d->m_reloadableResources.begin();
+         it != m_d->m_reloadableResources.end(); ++it) {
+        if (it.key() == object) {
+            m_d->m_reloadableResources.erase(it);
+            break;
+        }
+    }
+
+    for (auto it = m_d->m_reloadablePropertySheets.begin();
+         it != m_d->m_reloadablePropertySheets.end(); ++it) {
+        if (it.key() == object) {
+            m_d->m_reloadablePropertySheets.erase(it);
+            break;
+        }
+    }
 }
 
 void FormWindowBase::reloadProperties()
@@ -398,7 +446,7 @@ void FormWindowBase::deleteWidgetList(const QWidgetList &widget_list)
         tr("Delete '%1'").arg(widget_list.front()->objectName()) : tr("Delete");
 
     commandHistory()->beginMacro(description);
-    foreach (QWidget *w, widget_list) {
+    for (QWidget *w : qAsConst(widget_list)) {
         emit widgetRemoved(w);
         DeleteWidgetCommand *cmd = new DeleteWidgetCommand(this);
         cmd->init(w);
@@ -485,7 +533,8 @@ QStringList FormWindowBase::checkContents() const
     // Test for non-laid toplevel spacers, which will not be saved
     // as not to throw off uic.
     QStringList problems;
-    foreach (const Spacer *spacer, mainContainer()->findChildren<Spacer *>()) {
+    const auto &spacers = mainContainer()->findChildren<Spacer *>();
+    for (const Spacer *spacer : spacers) {
         if (spacer->parentWidget() && !spacer->parentWidget()->layout()) {
             problems.push_back(tr("<p>This file contains top level spacers.<br/>"
                                   "They will <b>not</b> be saved.</p><p>"

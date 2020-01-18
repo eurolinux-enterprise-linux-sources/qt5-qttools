@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the test suite of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -43,11 +38,18 @@
 #include <QtTest/QtTest>
 
 #ifndef QT_NO_PROCESS
-static const QString msgProcessError(const QProcess &process, const QString &what)
+static const QString msgProcessError(const QProcess &process, const QString &what,
+                                     const QByteArray &stdOut = QByteArray(),
+                                     const QByteArray &stdErr = QByteArray())
 {
     QString result;
-    QTextStream(&result) << what << ": \"" << process.program() << ' '
+    QTextStream str(&result);
+    str << what << ": \"" << process.program() << ' '
         << process.arguments().join(QLatin1Char(' ')) << "\": " << process.errorString();
+    if (!stdOut.isEmpty())
+        str << "\nStandard output:\n" << stdOut;
+    if (!stdErr.isEmpty())
+        str << "\nStandard error:\n" << stdErr;
     return result;
 }
 
@@ -57,7 +59,7 @@ static bool runProcess(const QString &binary,
                        const QString &workingDir = QString(),
                        const QProcessEnvironment &env = QProcessEnvironment(),
                        int timeOut = 5000,
-                       QByteArray *stdOut = Q_NULLPTR, QByteArray *stdErr = Q_NULLPTR)
+                       QByteArray *stdOutIn = nullptr, QByteArray *stdErrIn = nullptr)
 {
     QProcess process;
     if (!env.isEmpty())
@@ -78,16 +80,19 @@ static bool runProcess(const QString &binary,
             process.kill();
         return false;
     }
-    if (stdOut)
-        *stdOut = process.readAllStandardOutput();
-    if (stdErr)
-        *stdErr= process.readAllStandardError();
+    const QByteArray stdOut = process.readAllStandardOutput();
+    const QByteArray stdErr = process.readAllStandardError();
+    if (stdOutIn)
+        *stdOutIn = stdOut;
+    if (stdErrIn)
+        *stdErrIn = stdErr;
     if (process.exitStatus() != QProcess::NormalExit) {
-        *errorMessage = msgProcessError(process, "Crashed");
+        *errorMessage = msgProcessError(process, "Crashed", stdOut, stdErr);
         return false;
     }
     if (process.exitCode() != QProcess::NormalExit) {
-        *errorMessage = msgProcessError(process, "Exit code " + QString::number(process.exitCode()));
+        *errorMessage = msgProcessError(process, "Exit code " + QString::number(process.exitCode()),
+                                        stdOut, stdErr);
         return false;
     }
     return true;
@@ -161,7 +166,8 @@ void tst_windeployqt::deploy()
     const QChar pathSeparator(QLatin1Char(';')); // ### fixme: Qt 5.6: QDir::listSeparator()
     const QString origPath = env.value(pathKey);
     QString newPath;
-    foreach (const QString &pathElement, origPath.split(pathSeparator, QString::SkipEmptyParts)) {
+    const QStringList pathElements = origPath.split(pathSeparator, QString::SkipEmptyParts);
+    for (const QString &pathElement : pathElements) {
         if (pathElement.compare(qtBinDir, Qt::CaseInsensitive)
             && !pathElement.contains(QLatin1String("\\lib"), Qt::CaseInsensitive)) {
             if (!newPath.isEmpty())

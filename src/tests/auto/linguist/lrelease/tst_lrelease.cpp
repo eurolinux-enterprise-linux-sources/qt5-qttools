@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Linguist of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -44,7 +39,7 @@ class tst_lrelease : public QObject
 
 public:
     tst_lrelease()
-         : binDir(QLibraryInfo::location(QLibraryInfo::BinariesPath))
+         : lrelease(QLibraryInfo::location(QLibraryInfo::BinariesPath) + "/lrelease")
          , dataDir(QFINDTESTDATA("testdata/"))
     {}
 
@@ -60,7 +55,7 @@ private slots:
 private:
     void doCompare(const QStringList &actual, const QString &expectedFn);
 
-    QString binDir;
+    QString lrelease;
     QString dataDir;
 };
 
@@ -114,7 +109,7 @@ void tst_lrelease::doCompare(const QStringList &actual, const QString &expectedF
 
 void tst_lrelease::translate()
 {
-    QVERIFY(!QProcess::execute(binDir + "/lrelease " + dataDir + "translate.ts"));
+    QVERIFY(!QProcess::execute(lrelease, QStringList() << (dataDir + "translate.ts")));
 
     QTranslator translator;
     QVERIFY(translator.load(dataDir + "translate.qm"));
@@ -164,7 +159,7 @@ void tst_lrelease::translate()
 
 void tst_lrelease::compressed()
 {
-    QVERIFY(!QProcess::execute(binDir + "/lrelease -compress " + dataDir + "compressed.ts"));
+    QVERIFY(!QProcess::execute(lrelease, QStringList() << "-compress" << (dataDir + "compressed.ts")));
 
     QTranslator translator;
     QVERIFY(translator.load(dataDir + "compressed.qm"));
@@ -181,7 +176,7 @@ void tst_lrelease::compressed()
 
 void tst_lrelease::idbased()
 {
-    QVERIFY(!QProcess::execute(binDir + "/lrelease -idbased " + dataDir + "idbased.ts"));
+    QVERIFY(!QProcess::execute(lrelease, QStringList() << "-idbased" << (dataDir + "idbased.ts")));
 
     QTranslator translator;
     QVERIFY(translator.load(dataDir + "idbased.qm"));
@@ -193,7 +188,7 @@ void tst_lrelease::idbased()
 
 void tst_lrelease::markuntranslated()
 {
-    QVERIFY(!QProcess::execute(binDir + "/lrelease -markuntranslated # -idbased " + dataDir + "idbased.ts"));
+    QVERIFY(!QProcess::execute(lrelease, QStringList() << "-markuntranslated" << "#" << "-idbased" << (dataDir + "idbased.ts")));
 
     QTranslator translator;
     QVERIFY(translator.load(dataDir + "idbased.qm"));
@@ -206,7 +201,7 @@ void tst_lrelease::markuntranslated()
 void tst_lrelease::dupes()
 {
     QProcess proc;
-    proc.start(binDir + "/lrelease " + dataDir + "dupes.ts", QIODevice::ReadWrite | QIODevice::Text);
+    proc.start(lrelease, QStringList() << (dataDir + "dupes.ts"), QIODevice::ReadWrite | QIODevice::Text);
     QVERIFY(proc.waitForFinished());
     QVERIFY(proc.exitStatus() == QProcess::NormalExit);
     doCompare(QString(proc.readAllStandardError()).trimmed().split('\n'), dataDir + "dupes.errors");

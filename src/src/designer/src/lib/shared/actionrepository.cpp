@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -235,7 +230,7 @@ QMimeData *ActionModel::mimeData(const QModelIndexList &indexes ) const
     ActionRepositoryMimeData::ActionList actionList;
 
     QSet<QAction*> actions;
-    foreach (const QModelIndex &index, indexes)
+    for (const QModelIndex &index : indexes)
         if (QStandardItem *item = itemFromIndex(index))
             if (QAction *action = actionOfItem(item))
                 actions.insert(action);
@@ -498,10 +493,10 @@ ActionView::ActionView(QWidget *parent) :
     addWidget(m_actionListView);
     addWidget(m_actionTreeView);
     // Wire signals
-    connect(m_actionTreeView, SIGNAL(actionContextMenuRequested(QContextMenuEvent*,QAction*)),
-            this, SIGNAL(contextMenuRequested(QContextMenuEvent*,QAction*)));
-    connect(m_actionListView, SIGNAL(actionContextMenuRequested(QContextMenuEvent*,QAction*)),
-            this, SIGNAL(contextMenuRequested(QContextMenuEvent*,QAction*)));
+    connect(m_actionTreeView, &ActionTreeView::actionContextMenuRequested,
+            this, &ActionView::contextMenuRequested);
+    connect(m_actionListView, &ActionListView::actionContextMenuRequested,
+            this, &ActionView::contextMenuRequested);
 
     // make it possible for vs integration to reimplement edit action dialog
     // [which it shouldn't do actually]
@@ -519,8 +514,8 @@ ActionView::ActionView(QWidget *parent) :
     // sync selection models
     QItemSelectionModel *selectionModel = m_actionTreeView->selectionModel();
     m_actionListView->setSelectionModel(selectionModel);
-    connect(selectionModel, SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
-            this, SIGNAL(selectionChanged(QItemSelection,QItemSelection)));
+    connect(selectionModel, &QItemSelectionModel::selectionChanged,
+            this, &ActionView::selectionChanged);
 }
 
 int ActionView::viewMode() const
@@ -597,9 +592,11 @@ QItemSelection ActionView::selection() const
 ActionView::ActionList ActionView::selectedActions() const
 {
     ActionList rc;
-    foreach (const QModelIndex &index, selection().indexes())
+    const QModelIndexList &indexes = selection().indexes();
+    for (const QModelIndex &index : indexes) {
         if (index.column() == 0)
             rc += actionOfItem(m_model->itemFromIndex(index));
+    }
     return rc;
 }
 // ----------  ActionRepositoryMimeData
@@ -628,9 +625,11 @@ QPixmap  ActionRepositoryMimeData::actionDragPixmap(const QAction *action)
     if (!icon.isNull())
         return icon.pixmap(QSize(22, 22));
 
-    foreach (QWidget *w, action->associatedWidgets())
+    const QWidgetList &associatedWidgets = action->associatedWidgets();
+    for (QWidget *w : associatedWidgets) {
         if (QToolButton *tb = qobject_cast<QToolButton *>(w))
             return tb->grab(QRect(0, 0, -1, -1));
+    }
 
     // Create a QToolButton
     QToolButton *tb = new QToolButton;

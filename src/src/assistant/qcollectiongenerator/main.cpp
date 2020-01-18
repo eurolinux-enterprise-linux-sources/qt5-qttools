@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Assistant of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -47,6 +42,7 @@
 #include <QtCore/QLocale>
 #include <QtCore/QLibraryInfo>
 #include <QtHelp/QHelpEngineCore>
+#include <QtCore/QRegExp>
 #include <QtCore/QXmlStreamReader>
 
 #include <QtGui/QGuiApplication>
@@ -441,8 +437,8 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    QMap<QString, QString>::const_iterator it = config.filesToGenerate().constBegin();
-    while (it != config.filesToGenerate().constEnd()) {
+    const QMap<QString, QString> &filesToGenerate = config.filesToGenerate();
+    for (auto it = filesToGenerate.cbegin(), end = filesToGenerate.cend(); it != end; ++it) {
         fputs(qPrintable(QCG::tr("Generating help for %1...\n").arg(it.key())), stdout);
         QHelpProjectData helpData;
         if (!helpData.readData(absoluteFileName(basePath, it.key()))) {
@@ -455,7 +451,6 @@ int main(int argc, char *argv[])
             fprintf(stderr, "%s\n", qPrintable(helpGenerator.error()));
             return -1;
         }
-        ++it;
     }
 
     fputs(qPrintable(QCG::tr("Creating collection file...\n")), stdout);
@@ -475,7 +470,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    foreach (const QString &file, config.filesToRegister()) {
+    for (const QString &file : config.filesToRegister()) {
         if (!helpEngine.registerDocumentation(absoluteFileName(basePath, file))) {
             fprintf(stderr, "%s\n", qPrintable(helpEngine.error()));
             return -1;
@@ -517,7 +512,7 @@ int main(int argc, char *argv[])
     CollectionConfiguration::setAddressBarVisible(helpEngine,
          !config.hideAddressBar());
     CollectionConfiguration::setCreationTime(helpEngine,
-        QDateTime::currentDateTime().toTime_t());
+        QDateTime::currentMSecsSinceEpoch() / 1000);
     CollectionConfiguration::setFullTextSearchFallbackEnabled(helpEngine,
         config.fullTextSearchFallbackEnabled());
 
@@ -533,12 +528,9 @@ int main(int argc, char *argv[])
     if (config.aboutMenuTexts().count()) {
         QByteArray ba;
         QDataStream s(&ba, QIODevice::WriteOnly);
-        QMap<QString, QString>::const_iterator it = config.aboutMenuTexts().constBegin();
-        while (it != config.aboutMenuTexts().constEnd()) {
-            s << it.key();
-            s << it.value();
-            ++it;
-        }
+        const QMap<QString, QString> &aboutMenuTexts = config.aboutMenuTexts();
+        for (auto it = aboutMenuTexts.cbegin(), end = aboutMenuTexts.cend(); it != end; ++it)
+            s << it.key() << it.value();
         CollectionConfiguration::setAboutMenuTexts(helpEngine, ba);
     }
 
@@ -554,7 +546,6 @@ int main(int argc, char *argv[])
     if (config.aboutTextFiles().count()) {
         QByteArray ba;
         QDataStream s(&ba, QIODevice::WriteOnly);
-        QMap<QString, QString>::const_iterator it = config.aboutTextFiles().constBegin();
         QMap<QString, QByteArray> imgData;
 
         QRegExp srcRegExp(QLatin1String("src=(\"(.+)\"|([^\"\\s]+)).*>"));
@@ -562,7 +553,8 @@ int main(int argc, char *argv[])
         QRegExp imgRegExp(QLatin1String("(<img[^>]+>)"));
         imgRegExp.setMinimal(true);
 
-        while (it != config.aboutTextFiles().constEnd()) {
+        const QMap<QString, QString> &aboutMenuTexts = config.aboutTextFiles();
+        for (auto it = aboutMenuTexts.cbegin(), end = aboutMenuTexts.cend(); it != end; ++it) {
             s << it.key();
             QFileInfo fi(absoluteFileName(basePath, it.value()));
             QFile f(fi.absoluteFilePath());
@@ -594,7 +586,6 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            ++it;
         }
         CollectionConfiguration::setAboutTexts(helpEngine, ba);
         if (imgData.count()) {

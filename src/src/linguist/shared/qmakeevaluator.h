@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Linguist of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -153,7 +148,7 @@ public:
         { return b ? ReturnTrue : ReturnFalse; }
 
     static ALWAYS_INLINE uint getBlockLen(const ushort *&tokPtr);
-    void evaluateExpression(const ushort *&tokPtr, ProStringList *ret, bool joined);
+    VisitReturn evaluateExpression(const ushort *&tokPtr, ProStringList *ret, bool joined);
     static ALWAYS_INLINE void skipStr(const ushort *&tokPtr);
     static ALWAYS_INLINE void skipHashStr(const ushort *&tokPtr);
     void skipExpression(const ushort *&tokPtr);
@@ -173,7 +168,7 @@ public:
     VisitReturn visitProLoop(const ProKey &variable, const ushort *exprPtr,
                              const ushort *tokPtr);
     void visitProFunctionDef(ushort tok, const ProKey &name, const ushort *tokPtr);
-    void visitProVariable(ushort tok, const ProStringList &curr, const ushort *&tokPtr);
+    VisitReturn visitProVariable(ushort tok, const ProStringList &curr, const ushort *&tokPtr);
 
     ALWAYS_INLINE const ProKey &map(const ProString &var) { return map(var.toKey()); }
     const ProKey &map(const ProKey &var);
@@ -181,9 +176,8 @@ public:
 
     void setTemplate();
 
-    ProStringList split_value_list(const QString &vals, const ProFile *source = 0);
-    ProStringList expandVariableReferences(const ProString &value, int *pos = 0, bool joined = false);
-    ProStringList expandVariableReferences(const ushort *&tokPtr, int sizeHint = 0, bool joined = false);
+    ProStringList split_value_list(const QStringRef &vals, const ProFile *source = 0);
+    VisitReturn expandVariableReferences(const ushort *&tokPtr, int sizeHint, ProStringList *ret, bool joined);
 
     QString currentFileName() const;
     QString currentDirectory() const;
@@ -208,28 +202,28 @@ public:
     void deprecationWarning(const QString &msg) const
             { message(QMakeHandler::EvalWarnDeprecated, msg); }
 
-    QList<ProStringList> prepareFunctionArgs(const ushort *&tokPtr);
-    ProStringList evaluateFunction(const ProFunctionDef &func,
-                                   const QList<ProStringList> &argumentsList, VisitReturn *ok);
+    VisitReturn prepareFunctionArgs(const ushort *&tokPtr, QList<ProStringList> *ret);
+    VisitReturn evaluateFunction(const ProFunctionDef &func,
+                                 const QList<ProStringList> &argumentsList, ProStringList *ret);
     VisitReturn evaluateBoolFunction(const ProFunctionDef &func,
                                      const QList<ProStringList> &argumentsList,
                                      const ProString &function);
 
-    ProStringList evaluateExpandFunction(const ProKey &function, const ushort *&tokPtr);
+    VisitReturn evaluateExpandFunction(const ProKey &function, const ushort *&tokPtr, ProStringList *ret);
     VisitReturn evaluateConditionalFunction(const ProKey &function, const ushort *&tokPtr);
 
     ProStringList evaluateBuiltinExpand(int func_t, const ProKey &function, const ProStringList &args);
     VisitReturn evaluateBuiltinConditional(int func_t, const ProKey &function, const ProStringList &args);
 
-    bool evaluateConditional(const QString &cond, const QString &where, int line = -1);
+    VisitReturn evaluateConditional(const QStringRef &cond, const QString &where, int line = -1);
 #ifdef PROEVALUATOR_FULL
-    void checkRequirements(const ProStringList &deps);
+    VisitReturn checkRequirements(const ProStringList &deps);
 #endif
 
     void updateMkspecPaths();
     void updateFeaturePaths();
 
-    bool isActiveConfig(const QString &config, bool regex = false);
+    bool isActiveConfig(const QStringRef &config, bool regex = false);
 
     void populateDeps(
             const ProStringList &deps, const ProString &prefix, const ProStringList &suffixes,
@@ -237,12 +231,16 @@ public:
             QHash<ProKey, QSet<ProKey> > &dependencies, ProValueMap &dependees,
             QMultiMap<int, ProString> &rootSet) const;
 
+    bool getMemberArgs(const ProKey &name, int srclen, const ProStringList &args,
+                       int *start, int *end);
+    VisitReturn parseJsonInto(const QByteArray &json, const QString &into, ProValueMap *value);
+
     VisitReturn writeFile(const QString &ctx, const QString &fn, QIODevice::OpenMode mode,
-                          const QString &contents);
+                          bool exe, const QString &contents);
 #ifndef QT_BOOTSTRAPPED
     void runProcess(QProcess *proc, const QString &command) const;
 #endif
-    QByteArray getCommandOutput(const QString &args) const;
+    QByteArray getCommandOutput(const QString &args, int *exitCode) const;
 
     QMakeEvaluator *m_caller;
 #ifdef PROEVALUATOR_CUMULATIVE

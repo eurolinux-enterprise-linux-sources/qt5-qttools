@@ -1,12 +1,22 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the examples of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:BSD$
-** You may use this file under the terms of the BSD license as follows:
+** Commercial License Usage
+** Licensees holding valid commercial Qt licenses may use this file in
+** accordance with the commercial license agreement provided with the
+** Software or, alternatively, in accordance with the terms contained in
+** a written agreement between you and The Qt Company. For licensing terms
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
+**
+** BSD License Usage
+** Alternatively, you may use this file under the terms of the BSD license
+** as follows:
 **
 ** "Redistribution and use in source and binary forms, with or without
 ** modification, are permitted provided that the following conditions are
@@ -49,33 +59,32 @@
 //! [0]
 TicTacToePlugin::TicTacToePlugin(QObject *parent)
     : QObject(parent)
-    , initialized(false)
 {
 }
 
 QString TicTacToePlugin::name() const
 {
-    return "TicTacToe";
+    return QStringLiteral("TicTacToe");
 }
 
 QString TicTacToePlugin::group() const
 {
-    return "Display Widgets [Examples]";
+    return QStringLiteral("Display Widgets [Examples]");
 }
 
 QString TicTacToePlugin::toolTip() const
 {
-    return "";
+    return QString();
 }
 
 QString TicTacToePlugin::whatsThis() const
 {
-    return "";
+    return QString();
 }
 
 QString TicTacToePlugin::includeFile() const
 {
-    return "tictactoe.h";
+    return QStringLiteral("tictactoe.h");
 }
 
 QIcon TicTacToePlugin::icon() const
@@ -91,7 +100,7 @@ bool TicTacToePlugin::isContainer() const
 QWidget *TicTacToePlugin::createWidget(QWidget *parent)
 {
     TicTacToe *ticTacToe = new TicTacToe(parent);
-    ticTacToe->setState("-X-XO----");
+    ticTacToe->setState(QStringLiteral("-X-XO----"));
     return ticTacToe;
 }
 

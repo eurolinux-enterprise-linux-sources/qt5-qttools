@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -704,8 +699,6 @@ QDesignerPropertySheet::QDesignerPropertySheet(QObject *object, QObject *parent)
 
 QDesignerPropertySheet::~QDesignerPropertySheet()
 {
-    if (d->m_fwb)
-        d->m_fwb->removeReloadablePropertySheet(this);
     delete d;
 }
 
@@ -1632,8 +1625,6 @@ struct QDesignerAbstractPropertySheetFactory::PropertySheetFactoryPrivate {
 
     typedef QMap<QObject*, QObject*> ExtensionMap;
     ExtensionMap m_extensions;
-    typedef QHash<QObject*, bool> ExtendedSet;
-    ExtendedSet m_extended;
 };
 
 QDesignerAbstractPropertySheetFactory::PropertySheetFactoryPrivate::PropertySheetFactoryPrivate() :
@@ -1658,30 +1649,20 @@ QDesignerAbstractPropertySheetFactory::~QDesignerAbstractPropertySheetFactory()
 
 QObject *QDesignerAbstractPropertySheetFactory::extension(QObject *object, const QString &iid) const
 {
-    typedef PropertySheetFactoryPrivate::ExtensionMap ExtensionMap;
     if (!object)
         return 0;
 
     if (iid != m_impl->m_propertySheetId && iid != m_impl->m_dynamicPropertySheetId)
         return 0;
 
-    ExtensionMap::iterator it = m_impl->m_extensions.find(object);
-    if (it == m_impl->m_extensions.end()) {
-        if (QObject *ext = createPropertySheet(object, const_cast<QDesignerAbstractPropertySheetFactory*>(this))) {
-            connect(ext, &QObject::destroyed, this, &QDesignerAbstractPropertySheetFactory::objectDestroyed);
-            it = m_impl->m_extensions.insert(object, ext);
-        }
-    }
-
-    if (!m_impl->m_extended.contains(object)) {
+    QObject *ext = m_impl->m_extensions.value(object, 0);
+    if (!ext && (ext = createPropertySheet(object, const_cast<QDesignerAbstractPropertySheetFactory*>(this)))) {
+        connect(ext, &QObject::destroyed, this, &QDesignerAbstractPropertySheetFactory::objectDestroyed);
         connect(object, &QObject::destroyed, this, &QDesignerAbstractPropertySheetFactory::objectDestroyed);
-        m_impl->m_extended.insert(object, true);
+        m_impl->m_extensions.insert(object, ext);
     }
 
-    if (it == m_impl->m_extensions.end())
-        return 0;
-
-    return it.value();
+    return ext;
 }
 
 void QDesignerAbstractPropertySheetFactory::objectDestroyed(QObject *object)
@@ -1689,14 +1670,15 @@ void QDesignerAbstractPropertySheetFactory::objectDestroyed(QObject *object)
     QMutableMapIterator<QObject*, QObject*> it(m_impl->m_extensions);
     while (it.hasNext()) {
         it.next();
-
-        QObject *o = it.key();
-        if (o == object || object == it.value()) {
+        if (it.key() == object || it.value() == object) {
+            if (it.key() == object) {
+                QObject *ext = it.value();
+                disconnect(ext, &QObject::destroyed, this, &QDesignerAbstractPropertySheetFactory::objectDestroyed);
+                delete ext;
+            }
             it.remove();
         }
     }
-
-    m_impl->m_extended.remove(object);
 }
 
 QT_END_NAMESPACE

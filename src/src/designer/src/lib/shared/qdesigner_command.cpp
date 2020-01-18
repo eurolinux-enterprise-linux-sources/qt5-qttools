@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -615,6 +610,7 @@ void ReparentWidgetCommand::undo()
     m_oldParentWidget->setProperty("_q_zOrder", QVariant::fromValue(m_oldParentZOrder));
 
     QWidgetList newZOrder = qvariant_cast<QWidgetList>(m_newParentWidget->property("_q_zOrder"));
+    newZOrder.removeAll(m_widget);
     m_newParentWidget->setProperty("_q_zOrder", QVariant::fromValue(newZOrder));
 
     m_widget->show();
@@ -635,7 +631,7 @@ void PromoteToCustomWidgetCommand::init(const WidgetList &widgets,const QString 
 
 void PromoteToCustomWidgetCommand::redo()
 {
-    foreach (QWidget *w, m_widgets) {
+    for (QWidget *w : qAsConst(m_widgets)) {
         if (w)
             promoteWidget(core(), w, m_customClassName);
     }
@@ -654,7 +650,7 @@ void PromoteToCustomWidgetCommand::updateSelection()
 
 void PromoteToCustomWidgetCommand::undo()
 {
-    foreach (QWidget *w, m_widgets) {
+    for (QWidget *w : qAsConst(m_widgets)) {
         if (w)
             demoteWidget(core(), w);
     }
@@ -869,7 +865,7 @@ void BreakLayoutCommand::redo()
     m_layout->breakLayout();
     delete deco; // release the extension
 
-    foreach (QWidget *widget, m_widgets) {
+    for (QWidget *widget : qAsConst(m_widgets)) {
         widget->resize(widget->size().expandedTo(QSize(16, 16)));
     }
     // Update unless we are in an intermediate state of morphing layout
@@ -2177,7 +2173,7 @@ static void copyRoleFromItem(ItemData *id, int role, const T *item)
 template<class T>
 static void copyRolesFromItem(ItemData *id, const T *item, bool editor)
 {
-    static const int defaultFlags = T().flags();
+    static const Qt::ItemFlags defaultFlags = T().flags();
 
     for (int i = 0; itemRoles[i] != -1; i++)
         copyRoleFromItem<T>(id, itemRoles[i], item);
@@ -2185,7 +2181,7 @@ static void copyRolesFromItem(ItemData *id, const T *item, bool editor)
     if (editor)
         copyRoleFromItem<T>(id, ItemFlagsShadowRole, item);
     else if (item->flags() != defaultFlags)
-        id->m_properties.insert(ItemFlagsShadowRole, QVariant::fromValue((int)item->flags()));
+        id->m_properties.insert(ItemFlagsShadowRole, QVariant::fromValue(int(item->flags())));
 }
 
 template<class T>
@@ -2302,7 +2298,7 @@ QTreeWidgetItem *ListContents::createTreeItem(DesignerIconCache *iconCache) cons
 {
     QTreeWidgetItem *item = new QTreeWidgetItem;
     int i = 0;
-    foreach (const ItemData &id, m_items)
+    for (const ItemData &id : m_items)
         id.fillTreeItemColumn(item, i++, iconCache);
     return item;
 }
@@ -2320,7 +2316,7 @@ void ListContents::applyToListWidget(QListWidget *listWidget, DesignerIconCache 
     listWidget->clear();
 
     int i = 0;
-    foreach (const ItemData &entry, m_items) {
+    for (const ItemData &entry : m_items) {
         if (!entry.isValid())
             new QListWidgetItem(TableWidgetContents::defaultHeaderText(i), listWidget);
         else
@@ -2353,7 +2349,7 @@ void ListContents::applyToComboBox(QComboBox *comboBox, DesignerIconCache *iconC
 {
     comboBox->clear();
 
-    foreach (const ItemData &hash, m_items) {
+    for (const ItemData &hash : m_items) {
         QIcon icon;
         if (iconCache)
             icon = iconCache->icon(qvariant_cast<PropertySheetIconValue>(
@@ -2394,7 +2390,7 @@ QString TableWidgetContents::defaultHeaderText(int i)
 
 bool TableWidgetContents::nonEmpty(const QTableWidgetItem *item, int headerColumn)
 {
-    static int defaultFlags = QTableWidgetItem().flags();
+    static const Qt::ItemFlags defaultFlags = QTableWidgetItem().flags();
 
     if (item->flags() != defaultFlags)
         return true;
@@ -2453,14 +2449,14 @@ void TableWidgetContents::applyToTableWidget(QTableWidget *tableWidget, Designer
 
     // horiz header
     int col = 0;
-    foreach (const ItemData &id, m_horizontalHeader.m_items) {
+    for (const ItemData &id : m_horizontalHeader.m_items) {
         if (id.isValid())
             tableWidget->setHorizontalHeaderItem(col, id.createTableItem(iconCache, editor));
         col++;
     }
     // vertical header
     int row = 0;
-    foreach (const ItemData &id, m_verticalHeader.m_items) {
+    for (const ItemData &id : m_verticalHeader.m_items) {
         if (id.isValid())
             tableWidget->setVerticalHeaderItem(row, id.createTableItem(iconCache, editor));
         row++;
@@ -2515,13 +2511,13 @@ void ChangeTableContentsCommand::undo()
 TreeWidgetContents::ItemContents::ItemContents(const QTreeWidgetItem *item, bool editor) :
     ListContents(item)
 {
-    static const int defaultFlags = QTreeWidgetItem().flags();
+    static const Qt::ItemFlags defaultFlags = QTreeWidgetItem().flags();
 
     if (editor) {
         QVariant v = item->data(0, ItemFlagsShadowRole);
         m_itemFlags = v.isValid() ? v.toInt() : -1;
     } else  {
-        m_itemFlags = (item->flags() != defaultFlags) ? (int)item->flags() : -1;
+        m_itemFlags = (item->flags() != defaultFlags) ? int(item->flags()) : -1;
     }
 
     for (int i = 0; i < item->childCount(); i++)
@@ -2542,7 +2538,7 @@ QTreeWidgetItem *TreeWidgetContents::ItemContents::createTreeItem(DesignerIconCa
             item->setFlags((Qt::ItemFlags)m_itemFlags);
     }
 
-    foreach (const ItemContents &ic, m_children)
+    for (const ItemContents &ic : m_children)
         item->addChild(ic.createTreeItem(iconCache, editor));
 
     return item;
@@ -2576,7 +2572,7 @@ void TreeWidgetContents::applyToTreeWidget(QTreeWidget *treeWidget, DesignerIcon
 
     treeWidget->setColumnCount(m_headerItem.m_items.count());
     treeWidget->setHeaderItem(m_headerItem.createTreeItem(iconCache));
-    foreach (const ItemContents &ic, m_rootItems)
+    for (const ItemContents &ic : m_rootItems)
         treeWidget->addTopLevelItem(ic.createTreeItem(iconCache, editor));
     treeWidget->expandAll();
 }
@@ -2699,7 +2695,8 @@ static RemoveActionCommand::ActionData findActionIn(QAction *action)
 {
     RemoveActionCommand::ActionData result;
     // We only want menus and toolbars, no toolbuttons.
-    foreach (QWidget *widget, action->associatedWidgets())
+    const QWidgetList &associatedWidgets = action->associatedWidgets();
+    for (QWidget *widget : associatedWidgets) {
         if (qobject_cast<const QMenu *>(widget) || qobject_cast<const QToolBar *>(widget)) {
             const QList<QAction*> actionList = widget->actions();
             const int size = actionList.size();
@@ -2713,6 +2710,7 @@ static RemoveActionCommand::ActionData findActionIn(QAction *action)
                 }
             }
         }
+    }
     return result;
 }
 
@@ -2727,7 +2725,7 @@ void RemoveActionCommand::init(QAction *action)
 void RemoveActionCommand::redo()
 {
     QDesignerFormWindowInterface *fw = formWindow();
-    foreach (const ActionDataItem &item, m_actionData) {
+    for (const ActionDataItem &item : qAsConst(m_actionData)) {
         item.widget->removeAction(m_action);
     }
     // Notify components (for example, signal slot editor)
@@ -2744,9 +2742,8 @@ void RemoveActionCommand::undo()
 {
     core()->actionEditor()->setFormWindow(formWindow());
     core()->actionEditor()->manageAction(m_action);
-    foreach (const ActionDataItem &item, m_actionData) {
+    for (const ActionDataItem &item : qAsConst(m_actionData))
         item.widget->insertAction(item.before, m_action);
-    }
     if (!m_actionData.empty())
         core()->objectInspector()->setFormWindow(formWindow());
 }

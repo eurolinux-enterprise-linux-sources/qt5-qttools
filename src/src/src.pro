@@ -6,7 +6,6 @@ qtHaveModule(widgets) {
     } else {
         SUBDIRS = assistant \
                   pixeltool \
-                  qtestlib \
                   designer
 
         linguist.depends = designer
@@ -15,8 +14,13 @@ qtHaveModule(widgets) {
 
 SUBDIRS += linguist \
     qdoc \
-    qtplugininfo
-if(!android|android_app):!ios: SUBDIRS += qtpaths
+    qtattributionsscanner
+
+qtConfig(library) {
+    !android|android_app: SUBDIRS += qtplugininfo
+}
+
+if(!android|android_app):!uikit: SUBDIRS += qtpaths
 
 mac {
     SUBDIRS += macdeployqt
@@ -30,9 +34,19 @@ qtHaveModule(dbus): SUBDIRS += qdbus
 
 win32|winrt:SUBDIRS += windeployqt
 winrt:SUBDIRS += winrtrunner
-qtHaveModule(gui):!android:!ios:!qnx:!wince*:!winrt*:SUBDIRS += qtdiag
+qtHaveModule(gui):!android:!uikit:!qnx:!winrt: SUBDIRS += qtdiag
 
 qtNomakeTools( \
     pixeltool \
     macdeployqt \
 )
+
+# This is necessary to avoid a race condition between toolchain.prf
+# invocations in a module-by-module cross-build.
+cross_compile:isEmpty(QMAKE_HOST_CXX.INCDIRS) {
+    androiddeployqt.depends += qtattributionsscanner
+    qdoc.depends += qtattributionsscanner
+    windeployqt.depends += qtattributionsscanner
+    winrtrunner.depends += qtattributionsscanner
+    linguist.depends += qtattributionsscanner
+}

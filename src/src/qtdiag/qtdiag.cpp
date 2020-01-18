@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the tools applications of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -55,7 +50,9 @@
 #include <QtCore/QVariant>
 #include <QtCore/QSysInfo>
 #include <QtCore/QLibraryInfo>
-#include <QtCore/QProcessEnvironment>
+#if QT_CONFIG(processenvironment)
+#  include <QtCore/QProcessEnvironment>
+#endif
 #include <QtCore/QTextStream>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
@@ -67,8 +64,13 @@
 #include <qpa/qplatformintegration.h>
 #include <qpa/qplatformscreen.h>
 #include <qpa/qplatformtheme.h>
+#include <qpa/qplatformthemefactory_p.h>
 #include <qpa/qplatformnativeinterface.h>
 #include <private/qhighdpiscaling_p.h>
+
+#ifdef QT_WIDGETS_LIB
+#  include <QtWidgets/QStyleFactory>
+#endif
 
 #include <algorithm>
 
@@ -179,7 +181,7 @@ void dumpGlInfo(QTextStream &str, bool listExtensions)
             QList<QByteArray> extensionList = context.extensions().toList();
             std::sort(extensionList.begin(), extensionList.end());
             str << " \nFound " << extensionList.size() << " extensions:\n";
-            foreach (const QByteArray &extension, extensionList)
+            for (const QByteArray &extension : qAsConst(extensionList))
                 str << "  " << extension << '\n';
         }
     } else {
@@ -352,7 +354,8 @@ QString qtDiag(unsigned flags)
 #ifndef QT_NO_PROCESS
     const QProcessEnvironment systemEnvironment = QProcessEnvironment::systemEnvironment();
     str << "\nEnvironment:\n";
-    foreach (const QString &key, systemEnvironment.keys()) {
+    const QStringList keys = systemEnvironment.keys();
+    for (const QString &key : keys) {
         if (key.startsWith(QLatin1Char('Q')))
            str << "  " << key << "=\"" << systemEnvironment.value(key) << "\"\n";
     }
@@ -401,7 +404,8 @@ QString qtDiag(unsigned flags)
     DUMP_STANDARDPATH(str, AppConfigLocation)
 
     str << "\nFile selectors (increasing order of precedence):\n ";
-    foreach (const QString &s, QFileSelector().allSelectors())
+    const QStringList allSelectors = QFileSelector().allSelectors();
+    for (const QString &s : allSelectors)
         str << ' ' << s;
 
     str << "\n\nNetwork:\n  ";
@@ -470,16 +474,21 @@ QString qtDiag(unsigned flags)
 
     const QPlatformTheme *platformTheme = QGuiApplicationPrivate::platformTheme();
     str << "\nTheme:"
-           "\n  Available    : " << platformIntegration->themeNames()
-        << "\n  Styles       : " << platformTheme->themeHint(QPlatformTheme::StyleNames).toStringList();
+           "\n  Platforms requested : " << platformIntegration->themeNames()
+        << "\n            available : " << QPlatformThemeFactory::keys()
+#ifdef QT_WIDGETS_LIB
+        << "\n  Styles requested    : " << platformTheme->themeHint(QPlatformTheme::StyleNames).toStringList()
+        << "\n         available    : " << QStyleFactory::keys()
+#endif
+           ;
     const QString iconTheme = platformTheme->themeHint(QPlatformTheme::SystemIconThemeName).toString();
     if (!iconTheme.isEmpty()) {
-        str << "\n  Icon theme   : " << iconTheme
+        str << "\n  Icon theme          : " << iconTheme
             << ", " << platformTheme->themeHint(QPlatformTheme::SystemIconFallbackThemeName).toString()
-            << " from " << platformTheme->themeHint(QPlatformTheme::IconThemeSearchPaths).toStringList() << '\n';
+            << " from " << platformTheme->themeHint(QPlatformTheme::IconThemeSearchPaths).toStringList();
     }
     if (const QFont *systemFont = platformTheme->font())
-        str << "\n  System font  : " << *systemFont<< '\n';
+        str << "\n  System font         : " << *systemFont<< '\n';
 
     if (platformTheme->usePlatformNativeDialog(QPlatformTheme::FileDialog))
         str << "  Native file dialog\n";
@@ -527,6 +536,9 @@ QString qtDiag(unsigned flags)
         str << '#' << ' ' << s << " \"" << screen->name() << '"'
                   << " Depth: " << screen->depth()
                   << " Primary: " <<  (screen == QGuiApplication::primaryScreen() ? "yes" : "no")
+            << "\n  Manufacturer: " << screen->manufacturer()
+            << "\n  Model: " << screen->model()
+            << "\n  Serial number: " << screen->serialNumber()
             << "\n  Geometry: " << geometry;
         if (geometry != nativeGeometry)
             str << " (native: " << nativeGeometry << ')';
@@ -558,7 +570,7 @@ QString qtDiag(unsigned flags)
     const QList<const QTouchDevice *> touchDevices = QTouchDevice::devices();
     if (!touchDevices.isEmpty()) {
         str << "Touch devices: " << touchDevices.size() << '\n';
-        foreach (const QTouchDevice *device, touchDevices) {
+        for (const QTouchDevice *device : touchDevices) {
             str << "  " << (device->type() == QTouchDevice::TouchScreen ? "TouchScreen" : "TouchPad")
                 << " \"" << device->name() << "\", max " << device->maximumTouchPoints()
                 << " touch points, capabilities:";

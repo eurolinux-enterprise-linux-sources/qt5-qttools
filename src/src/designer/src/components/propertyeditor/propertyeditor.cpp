@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -75,9 +70,7 @@
 #include <QtCore/QTextStream>
 
 static const char *SettingsGroupC = "PropertyEditor";
-#if QT_VERSION >= 0x040500
 static const char *ViewKeyC = "View";
-#endif
 static const char *ColorKeyC = "Colored";
 static const char *SortedKeyC = "Sorted";
 static const char *ExpansionKeyC = "ExpandedItems";
@@ -298,11 +291,9 @@ PropertyEditor::PropertyEditor(QDesignerFormEditorInterface *core, QWidget *pare
 
     configureMenu->addAction(m_sortingAction);
     configureMenu->addAction(m_coloringAction);
-#if QT_VERSION >= 0x04FF00
     configureMenu->addSeparator();
     configureMenu->addAction(m_treeAction);
     configureMenu->addAction(m_buttonAction);
-#endif
     // Assemble toolbar
     QToolBar *toolBar = new QToolBar;
     toolBar->addWidget(m_filterWidget);
@@ -358,9 +349,7 @@ PropertyEditor::PropertyEditor(QDesignerFormEditorInterface *core, QWidget *pare
     // retrieve initial settings
     QDesignerSettingsInterface *settings = m_core->settingsManager();
     settings->beginGroup(QLatin1String(SettingsGroupC));
-#if QT_VERSION >= 0x040500
     const SettingsView view = settings->value(QLatin1String(ViewKeyC), TreeView).toInt() == TreeView ? TreeView :  ButtonView;
-#endif
     // Coloring not available unless treeview and not sorted
     m_sorting = settings->value(QLatin1String(SortedKeyC), false).toBool();
     m_coloring = settings->value(QLatin1String(ColorKeyC), true).toBool();
@@ -371,7 +360,6 @@ PropertyEditor::PropertyEditor(QDesignerFormEditorInterface *core, QWidget *pare
     m_sortingAction->setChecked(m_sorting);
     m_coloringAction->setChecked(m_coloring);
     m_treeBrowser->setSplitterPosition(splitterPosition);
-#if QT_VERSION >= 0x040500
     switch (view) {
     case TreeView:
         m_currentBrowser = m_treeBrowser;
@@ -384,7 +372,6 @@ PropertyEditor::PropertyEditor(QDesignerFormEditorInterface *core, QWidget *pare
         m_buttonAction->setChecked(true);
         break;
     }
-#endif
     // Restore expansionState from QVariant map
     if (!expansionState.empty()) {
         const QVariantMap::const_iterator cend = expansionState.constEnd();
@@ -404,9 +391,7 @@ void PropertyEditor::saveSettings() const
 {
     QDesignerSettingsInterface *settings = m_core->settingsManager();
     settings->beginGroup(QLatin1String(SettingsGroupC));
-#if QT_VERSION >= 0x040500
     settings->setValue(QLatin1String(ViewKeyC), QVariant(m_treeAction->isChecked() ? TreeView : ButtonView));
-#endif
     settings->setValue(QLatin1String(ColorKeyC), QVariant(m_coloring));
     settings->setValue(QLatin1String(SortedKeyC), QVariant(m_sorting));
     // Save last expansionState as QVariant map
@@ -460,9 +445,7 @@ bool PropertyEditor::isItemVisible(QtBrowserItem *item) const
 void PropertyEditor::storePropertiesExpansionState(const QList<QtBrowserItem *> &items)
 {
     const QChar bar = QLatin1Char('|');
-    QListIterator<QtBrowserItem *> itProperty(items);
-    while (itProperty.hasNext()) {
-        QtBrowserItem *propertyItem = itProperty.next();
+    for (QtBrowserItem *propertyItem : items) {
         if (!propertyItem->children().empty()) {
             QtProperty *property = propertyItem->property();
             const QString propertyName = property->propertyName();
@@ -483,9 +466,7 @@ void PropertyEditor::storeExpansionState()
     if (m_sorting) {
         storePropertiesExpansionState(items);
     } else {
-        QListIterator<QtBrowserItem *> itGroup(items);
-        while (itGroup.hasNext()) {
-            QtBrowserItem *item = itGroup.next();
+        for (QtBrowserItem *item : items) {
             const QString groupName = item->property()->propertyName();
             QList<QtBrowserItem *> propertyItems = item->children();
             if (!propertyItems.empty())
@@ -499,19 +480,16 @@ void PropertyEditor::storeExpansionState()
 
 void PropertyEditor::collapseAll()
 {
-    QList<QtBrowserItem *> items = m_currentBrowser->topLevelItems();
-    QListIterator<QtBrowserItem *> itGroup(items);
-    while (itGroup.hasNext())
-        setExpanded(itGroup.next(), false);
+    const QList<QtBrowserItem *> items = m_currentBrowser->topLevelItems();
+    for (QtBrowserItem *group : items)
+        setExpanded(group, false);
 }
 
 void PropertyEditor::applyPropertiesExpansionState(const QList<QtBrowserItem *> &items)
 {
     const QChar bar = QLatin1Char('|');
-    QListIterator<QtBrowserItem *> itProperty(items);
-    while (itProperty.hasNext()) {
+    for (QtBrowserItem *propertyItem : items) {
         const QMap<QString, bool>::const_iterator excend = m_expansionState.constEnd();
-        QtBrowserItem *propertyItem = itProperty.next();
         QtProperty *property = propertyItem->property();
         const QString propertyName = property->propertyName();
         const QMap<QtProperty *, QString>::const_iterator itGroup = m_propertyToGroup.constFind(property);
@@ -534,10 +512,8 @@ void PropertyEditor::applyExpansionState()
     if (m_sorting) {
         applyPropertiesExpansionState(items);
     } else {
-        QListIterator<QtBrowserItem *> itTopLevel(items);
         const QMap<QString, bool>::const_iterator excend = m_expansionState.constEnd();
-        while (itTopLevel.hasNext()) {
-            QtBrowserItem *item = itTopLevel.next();
+        for (QtBrowserItem *item : items) {
             const QString groupName = item->property()->propertyName();
             const QMap<QString, bool>::const_iterator git = m_expansionState.constFind(groupName);
             if (git != excend)
@@ -554,9 +530,7 @@ int PropertyEditor::applyPropertiesFilter(const QList<QtBrowserItem *> &items)
 {
     int showCount = 0;
     const bool matchAll = m_filterPattern.isEmpty();
-    QListIterator<QtBrowserItem *> itProperty(items);
-    while (itProperty.hasNext()) {
-        QtBrowserItem *propertyItem = itProperty.next();
+    for (QtBrowserItem *propertyItem : items) {
         QtProperty *property = propertyItem->property();
         const QString propertyName = property->propertyName();
         const bool showProperty = matchAll || propertyName.contains(m_filterPattern, Qt::CaseInsensitive);
@@ -573,11 +547,8 @@ void PropertyEditor::applyFilter()
     if (m_sorting) {
         applyPropertiesFilter(items);
     } else {
-        QListIterator<QtBrowserItem *> itTopLevel(items);
-        while (itTopLevel.hasNext()) {
-            QtBrowserItem *item = itTopLevel.next();
+        for (QtBrowserItem *item : items)
             setItemVisible(item, applyPropertiesFilter(item->children()));
-        }
     }
 }
 
@@ -636,15 +607,10 @@ QColor PropertyEditor::propertyColor(QtProperty *property) const
 void PropertyEditor::fillView()
 {
     if (m_sorting) {
-        QMapIterator<QString, QtVariantProperty *> itProperty(m_nameToProperty);
-        while (itProperty.hasNext()) {
-            QtVariantProperty *property = itProperty.next().value();
-            m_currentBrowser->addProperty(property);
-        }
+        for (auto itProperty = m_nameToProperty.cbegin(), end = m_nameToProperty.cend(); itProperty != end; ++itProperty)
+            m_currentBrowser->addProperty(itProperty.value());
     } else {
-        QListIterator<QtProperty *> itGroup(m_groups);
-        while (itGroup.hasNext()) {
-            QtProperty *group = itGroup.next();
+        for (QtProperty *group : qAsConst(m_groups)) {
             QtBrowserItem *item = m_currentBrowser->addProperty(group);
             if (m_currentBrowser == m_treeBrowser)
                 m_treeBrowser->setBackgroundColor(item, propertyColor(group));
@@ -708,12 +674,9 @@ void PropertyEditor::slotSorting(bool sort)
 void PropertyEditor::updateColors()
 {
     if (m_treeBrowser && m_currentBrowser == m_treeBrowser) {
-        QList<QtBrowserItem *> items = m_treeBrowser->topLevelItems();
-        QListIterator<QtBrowserItem *> itItem(items);
-        while (itItem.hasNext()) {
-            QtBrowserItem *item = itItem.next();
+        const QList<QtBrowserItem *> items = m_treeBrowser->topLevelItems();
+        for (QtBrowserItem *item : items)
             m_treeBrowser->setBackgroundColor(item, propertyColor(item->property()));
-        }
     }
 }
 
@@ -989,10 +952,7 @@ void PropertyEditor::setObject(QObject *object)
         }
     }
 
-    QMapIterator<QString, QtVariantProperty *> itRemove(toRemove);
-    while (itRemove.hasNext()) {
-        itRemove.next();
-
+    for (auto itRemove = toRemove.cbegin(), end = toRemove.cend(); itRemove != end; ++itRemove) {
         QtVariantProperty *property = itRemove.value();
         m_nameToProperty.remove(itRemove.key());
         m_propertyToGroup.remove(property);
@@ -1036,19 +996,13 @@ void PropertyEditor::setObject(QObject *object)
                     newProperty = true;
                     if (type == DesignerPropertyManager::enumTypeId()) {
                         const PropertySheetEnumValue e = qvariant_cast<PropertySheetEnumValue>(value);
-                        QStringList names;
-                        QStringListIterator it(e.metaEnum.keys());
-                        while (it.hasNext())
-                            names.append(it.next());
                         m_updatingBrowser = true;
-                        property->setAttribute(m_strings.m_enumNamesAttribute, names);
+                        property->setAttribute(m_strings.m_enumNamesAttribute, e.metaEnum.keys());
                         m_updatingBrowser = false;
                     } else if (type == DesignerPropertyManager::designerFlagTypeId()) {
                         const PropertySheetFlagValue f = qvariant_cast<PropertySheetFlagValue>(value);
                         QList<QPair<QString, uint> > flags;
-                        QStringListIterator it(f.metaFlags.keys());
-                        while (it.hasNext()) {
-                            const QString name = it.next();
+                        for (const QString &name : f.metaFlags.keys()) {
                             const uint val = f.metaFlags.keyToValue(name);
                             flags.append(qMakePair(name, val));
                         }
@@ -1144,8 +1098,8 @@ void PropertyEditor::setObject(QObject *object)
 
                 property->setModified(m_propertySheet->isChanged(i));
                 if (propertyName == QStringLiteral("geometry") && type == QVariant::Rect) {
-                    QList<QtProperty *> subProperties = property->subProperties();
-                    foreach (QtProperty *subProperty, subProperties) {
+                    const QList<QtProperty *> &subProperties = property->subProperties();
+                    for (QtProperty *subProperty : subProperties) {
                         const QString subPropertyName = subProperty->propertyName();
                         if (subPropertyName == QStringLiteral("X") || subPropertyName == QStringLiteral("Y"))
                             subProperty->setEnabled(!isMainContainer);
@@ -1157,9 +1111,8 @@ void PropertyEditor::setObject(QObject *object)
         }
     }
     QMap<QString, QtVariantProperty *> groups = m_nameToGroup;
-    QMapIterator<QString, QtVariantProperty *> itGroup(groups);
-    while (itGroup.hasNext()) {
-        QtVariantProperty *groupProperty = itGroup.next().value();
+    for (auto itGroup = groups.cbegin(), end = groups.cend(); itGroup != end; ++itGroup) {
+        QtVariantProperty *groupProperty = itGroup.value();
         if (groupProperty->subProperties().empty()) {
             if (groupProperty == m_dynamicGroup)
                 m_dynamicGroup = 0;

@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -184,10 +179,8 @@ FormWindow::Selection::~Selection()
 void FormWindow::Selection::clear()
 {
     if (!m_usedSelections.empty()) {
-        const SelectionHash::iterator mend = m_usedSelections.end();
-        for (SelectionHash::iterator it = m_usedSelections.begin(); it != mend; ++it) {
+        for (auto it = m_usedSelections.begin(), mend = m_usedSelections.end(); it != mend; ++it)
             it.value()->setWidget(0);
-        }
         m_usedSelections.clear();
     }
 }
@@ -208,8 +201,7 @@ WidgetSelection *FormWindow::Selection::addWidget(FormWindow* fw, QWidget *w)
         return rc;
     }
     // find a free one in the pool
-    const SelectionPool::iterator pend = m_selectionPool.end();
-    for (SelectionPool::iterator it = m_selectionPool.begin(); it != pend; ++it) {
+    for (auto it = m_selectionPool.constBegin(), pend = m_selectionPool.constEnd(); it != pend; ++it) {
         if (! (*it)->isUsed()) {
             rc = *it;
             break;
@@ -249,10 +241,8 @@ void FormWindow::Selection::repaintSelection(QWidget *w)
 
 void FormWindow::Selection::repaintSelection()
 {
-    const SelectionHash::iterator mend = m_usedSelections.end();
-    for (SelectionHash::iterator it = m_usedSelections.begin(); it != mend; ++it) {
+    for (auto it = m_usedSelections.begin(), mend = m_usedSelections.end(); it != mend; ++it)
         it.value()->update();
-    }
 }
 
 bool FormWindow::Selection::isWidgetSelected(QWidget *w) const{
@@ -266,8 +256,7 @@ QWidgetList FormWindow::Selection::selectedWidgets() const
 
 void FormWindow::Selection::raiseList(const QWidgetList& l)
 {
-    const SelectionHash::iterator mend = m_usedSelections.end();
-    for (SelectionHash::iterator it = m_usedSelections.begin(); it != mend; ++it) {
+    for (auto it = m_usedSelections.constBegin(), mend = m_usedSelections.constEnd(); it != mend; ++it) {
         WidgetSelection *w = it.value();
         if (l.contains(w->widget()))
             w->show();
@@ -331,8 +320,8 @@ FormWindow::~FormWindow()
     core()->formWindowManager()->removeFormWindow(this);
     core()->metaDataBase()->remove(this);
 
-    QWidgetList l = widgets();
-    foreach (QWidget *w, l)
+    const QWidgetList &l = widgets();
+    for (QWidget *w : l)
         core()->metaDataBase()->remove(w);
 
     m_widgetStack = 0;
@@ -340,6 +329,10 @@ FormWindow::~FormWindow()
     if (resourceSet())
         core()->resourceModel()->removeResourceSet(resourceSet());
     delete m_selection;
+
+    if (FormWindowManager *manager = qobject_cast<FormWindowManager*> (core()->formWindowManager()))
+        manager->undoGroup()->removeStack(&m_undoStack);
+    m_undoStack.disconnect();
 }
 
 QDesignerFormEditorInterface *FormWindow::core() const
@@ -384,7 +377,7 @@ void FormWindow::setCursorToAll(const QCursor &c, QWidget *start)
 #ifndef QT_NO_CURSOR
     start->setCursor(c);
     const QWidgetList widgets = start->findChildren<QWidget*>();
-    foreach (QWidget *widget, widgets) {
+    for (QWidget *widget : widgets) {
         if (!qobject_cast<WidgetHandle*>(widget)) {
             widget->setCursor(c);
         }
@@ -395,7 +388,7 @@ void FormWindow::setCursorToAll(const QCursor &c, QWidget *start)
 void FormWindow::init()
 {
     if (FormWindowManager *manager = qobject_cast<FormWindowManager*> (core()->formWindowManager())) {
-        manager->undoGroup()->addStack(m_undoStack.qundoStack());
+        manager->undoGroup()->addStack(&m_undoStack);
     }
 
     m_blockSelectionChanged = false;
@@ -428,9 +421,11 @@ void FormWindow::init()
     m_mainContainer = 0;
     m_currentWidget = 0;
 
-    connect(&m_undoStack, &QDesignerUndoStack::changed,
+    connect(&m_undoStack, &QUndoStack::indexChanged,
             this, &QDesignerFormWindowInterface::changed);
-    connect(&m_undoStack, &QDesignerUndoStack::changed,
+    connect(&m_undoStack, &QUndoStack::cleanChanged,
+            this, &FormWindow::slotCleanChanged);
+    connect(this, &QDesignerFormWindowInterface::changed,
             this, &FormWindow::checkSelection);
 
     core()->metaDataBase()->add(this);
@@ -695,7 +690,7 @@ bool FormWindow::handleMouseMoveEvent(QWidget *, QWidget *, QMouseEvent *e)
 
     QSet<QWidget*> widget_set;
 
-    foreach (QWidget *child, sel) { // Move parent layout or container?
+    for (QWidget *child : qAsConst(sel)) { // Move parent layout or container?
         QWidget *current = child;
 
         bool done = false;
@@ -731,7 +726,7 @@ bool FormWindow::handleMouseMoveEvent(QWidget *, QWidget *, QMouseEvent *e)
     const QPoint globalPos = mapToGlobal(m_startPos);
     const QDesignerDnDItemInterface::DropType dropType = (mouseFlags(e->modifiers()) & CopyDragModifier) ?
                             QDesignerDnDItemInterface::CopyDrop : QDesignerDnDItemInterface::MoveDrop;
-    foreach (QWidget *widget, sel) {
+    for (QWidget *widget : qAsConst(sel)) {
         item_list.append(new FormWindowDnDItem(dropType,  this, widget, globalPos));
         if (dropType == QDesignerDnDItemInterface::MoveDrop) {
             m_selection->hide(widget);
@@ -743,7 +738,7 @@ bool FormWindow::handleMouseMoveEvent(QWidget *, QWidget *, QMouseEvent *e)
 
     if (!sel.empty()) // reshow selection?
         if (QDesignerMimeData::execDrag(item_list, core()->topLevel()) == Qt::IgnoreAction && dropType == QDesignerDnDItemInterface::MoveDrop)
-            foreach (QWidget *widget, sel)
+            for (QWidget *widget : qAsConst(sel))
                 m_selection->show(widget);
 
     m_startPos = QPoint();
@@ -1299,9 +1294,7 @@ QWidget *FormWindow::containerAt(const QPoint &pos, QWidget *notParentOf)
         depth = widgetDepth(container);
     }
 
-    QListIterator<QWidget*> it(m_widgets);
-    while (it.hasNext()) {
-        QWidget *wit = it.next();
+    for (QWidget *wit : qAsConst(m_widgets)) {
         if (qobject_cast<QLayoutWidget*>(wit) || qobject_cast<QSplitter*>(wit))
             continue;
         if (!wit->isVisibleTo(this))
@@ -1345,10 +1338,8 @@ void FormWindow::selectWidgets()
 {
     bool selectionChanged = false;
     const QWidgetList l = mainContainer()->findChildren<QWidget*>();
-    QListIterator <QWidget*> it(l);
     const QRect selRect(mapToGlobal(m_currRect.topLeft()), m_currRect.size());
-    while (it.hasNext()) {
-        QWidget *w = it.next();
+    for (QWidget *w : l) {
         if (w->isVisibleTo(this) && isManaged(w)) {
             const QPoint p = w->mapToGlobal(QPoint(0,0));
             const QRect r(p, w->size());
@@ -1521,7 +1512,7 @@ ArrowKeyPropertyCommand::ArrowKeyPropertyCommand(QDesignerFormWindowInterface *f
 void ArrowKeyPropertyCommand::init(QWidgetList &l, const ArrowKeyOperation &op)
 {
     QObjectList ol;
-    foreach(QWidget *w, l)
+    for (QWidget *w : qAsConst(l))
         ol.push_back(w);
     SetPropertyCommand::init(ol, QStringLiteral("geometry"), QVariant::fromValue(op));
 
@@ -1596,7 +1587,7 @@ bool FormWindow::handleKeyReleaseEvent(QWidget *, QWidget *, QKeyEvent *e)
 void FormWindow::selectAll()
 {
     bool selectionChanged = false;
-    foreach (QWidget *widget, m_widgets) {
+    for (QWidget *widget : qAsConst(m_widgets)) {
         if (widget->isVisibleTo(this) && trySelectWidget(widget, true))
             selectionChanged = true;
     }
@@ -1872,7 +1863,7 @@ void FormWindow::paste(PasteMode pasteMode)
 
         if (widgetCount) {
             positionPastedWidgetsAtMousePosition(this,  m_contextMenuPosition, pasteContainer, clipboard.m_widgets);
-            foreach (QWidget *w, clipboard.m_widgets) {
+            for (QWidget *w : clipboard.m_widgets) {
                 InsertWidgetCommand *cmd = new InsertWidgetCommand(this);
                 cmd->init(w);
                 m_undoStack.push(cmd);
@@ -1881,7 +1872,7 @@ void FormWindow::paste(PasteMode pasteMode)
         }
 
         if (actionCount)
-            foreach (QAction *a, clipboard.m_actions) {
+            for (QAction *a : clipboard.m_actions) {
                 ensureUniqueObjectName(a);
                 AddActionCommand *cmd = new AddActionCommand(this);
                 cmd->init(a);
@@ -2039,7 +2030,7 @@ void FormWindow::raiseWidgets()
         return;
 
     beginCommand(tr("Raise widgets"));
-    foreach (QWidget *widget, widgets) {
+    for (QWidget *widget : qAsConst(widgets)) {
         RaiseWidgetCommand *cmd = new RaiseWidgetCommand(this);
         cmd->init(widget);
         m_undoStack.push(cmd);
@@ -2056,7 +2047,7 @@ void FormWindow::lowerWidgets()
         return;
 
     beginCommand(tr("Lower widgets"));
-    foreach (QWidget *widget, widgets) {
+    for (QWidget *widget : qAsConst(widgets)) {
         LowerWidgetCommand *cmd = new LowerWidgetCommand(this);
         cmd->init(widget);
         m_undoStack.push(cmd);
@@ -2220,7 +2211,7 @@ bool FormWindow::hasInsertedChildren(QWidget *widget) const // ### move
 
     const QWidgetList l = widgets(widget);
 
-    foreach (QWidget *child, l) {
+    for (QWidget *child : l) {
         if (isManaged(child) && !LayoutInfo::isWidgetLaidout(core(), child) && child->isVisibleTo(const_cast<FormWindow*>(this)))
             return true;
     }
@@ -2233,6 +2224,12 @@ void FormWindow::slotSelectWidget(QAction *a)
 {
     if (QWidget *w = qvariant_cast<QWidget*>(a->data()))
         selectSingleWidget(w);
+}
+
+void FormWindow::slotCleanChanged(bool clean)
+{
+    if (!clean)
+        emit changed();
 }
 
 static inline QString objectNameOf(const QWidget *w)
@@ -2450,12 +2447,15 @@ FormWindow *FormWindow::findFormWindow(QWidget *w)
 
 bool FormWindow::isDirty() const
 {
-    return m_undoStack.isDirty();
+    return !m_undoStack.isClean();
 }
 
 void FormWindow::setDirty(bool dirty)
 {
-    m_undoStack.setDirty(dirty);
+    if (dirty)
+        m_undoStack.resetClean();
+    else
+        m_undoStack.setClean();
 }
 
 QWidget *FormWindow::containerAt(const QPoint &pos)
@@ -2624,7 +2624,8 @@ void FormWindow::checkSelectionNow()
 {
     m_checkSelectionTimer->stop();
 
-    foreach (QWidget *widget, selectedWidgets()) {
+    const QWidgetList &sel = selectedWidgets();
+    for (QWidget *widget : sel) {
         updateSelection(widget);
 
         if (LayoutInfo::layoutType(core(), widget) != LayoutInfo::NoLayout)
@@ -2863,7 +2864,7 @@ bool FormWindow::dropWidgets(const QList<QDesignerDnDItemInterface*> &item_list,
     QPoint offset;
     QDesignerDnDItemInterface *current = 0;
     QDesignerFormWindowCursorInterface *c = cursor();
-    foreach (QDesignerDnDItemInterface *item, item_list) {
+    for (QDesignerDnDItemInterface *item : qAsConst(item_list)) {
         QWidget *w = item->widget();
         if (!current)
             current = item;
@@ -2878,7 +2879,7 @@ bool FormWindow::dropWidgets(const QList<QDesignerDnDItemInterface*> &item_list,
         offset = designerGrid().snapPoint(topLeft) - topLeft;
     }
 
-    foreach (QDesignerDnDItemInterface *item, item_list) {
+    for (QDesignerDnDItemInterface *item : qAsConst(item_list)) {
         DomUI *dom_ui = item->domUi();
         QRect geometry = item->decoration()->geometry();
         Q_ASSERT(dom_ui != 0);
@@ -2990,7 +2991,7 @@ QWidget *FormWindow::formContainer() const
 
 QUndoStack *FormWindow::commandHistory() const
 {
-    return const_cast<QDesignerUndoStack &>(m_undoStack).qundoStack();
+    return &const_cast<QUndoStack &>(m_undoStack);
 }
 
 } // namespace

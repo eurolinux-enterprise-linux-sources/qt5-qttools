@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -72,7 +67,6 @@ static const char *defaultTypeValueC = "default";
 static const char *customValueC = "custom";
 static const char *iconPrefixC = "__qt_icon__";
 static const char *scratchPadValueC = "scratchpad";
-static const char *qtLogoC = "qtlogo.png";
 static const char *invisibleNameC = "[invisible]";
 
 enum TopLevelRole  { NORMAL_ITEM, SCRATCHPAD_ITEM, CUSTOM_ITEM };
@@ -115,7 +109,7 @@ WidgetBoxTreeWidget::WidgetBoxTreeWidget(QDesignerFormEditorInterface *core, QWi
 QIcon WidgetBoxTreeWidget::iconForWidget(QString iconName) const
 {
     if (iconName.isEmpty())
-        iconName = QLatin1String(qtLogoC);
+        return qdesigner_internal::qtLogoIcon();
 
     if (iconName.startsWith(QLatin1String(iconPrefixC))) {
         const IconCache::const_iterator it = m_pluginIcons.constFind(iconName);
@@ -320,7 +314,7 @@ bool WidgetBoxTreeWidget::loadContents(const QString &contents)
         return false;
     }
 
-    foreach(const Category &cat, cat_list)
+    for (const Category &cat : qAsConst(cat_list))
         addCategory(cat);
 
     addCustomCategories(false);
@@ -554,7 +548,7 @@ void WidgetBoxTreeWidget::writeCategories(QXmlStreamWriter &writer, const Catego
 
     writer.writeStartElement(widgetbox);
 
-    foreach (const Category &cat, cat_list) {
+    for (const Category &cat : cat_list) {
         writer.writeStartElement(category);
         writer.writeAttribute(name, cat.name());
         if (cat.type() == Category::Scratchpad)
@@ -589,7 +583,7 @@ void WidgetBoxTreeWidget::writeCategories(QXmlStreamWriter &writer, const Catego
 static int findCategory(const QString &name, const WidgetBoxTreeWidget::CategoryList &list)
 {
     int idx = 0;
-    foreach (const WidgetBoxTreeWidget::Category &cat, list) {
+    for (const WidgetBoxTreeWidget::Category &cat : list) {
         if (cat.name() == name)
             return idx;
         ++idx;
@@ -621,7 +615,7 @@ WidgetBoxTreeWidget::CategoryList WidgetBoxTreeWidget::loadCustomCategoryList() 
     const QString invisible = QLatin1String(invisibleNameC);
     const QString iconPrefix = QLatin1String(iconPrefixC);
 
-    foreach(QDesignerCustomWidgetInterface *c, customWidgets) {
+    for (QDesignerCustomWidgetInterface *c : customWidgets) {
         const QString dom_xml = c->domXml();
         if (dom_xml.isEmpty())
             continue;
@@ -652,8 +646,6 @@ WidgetBoxTreeWidget::CategoryList WidgetBoxTreeWidget::loadCustomCategoryList() 
             icon_name = iconPrefix;
             icon_name += pluginName;
             m_pluginIcons.insert(icon_name, icon);
-        } else {
-            icon_name = QLatin1String(qtLogoC);
         }
 
         cat.addWidget(Widget(displayName, dom_xml, icon_name, Widget::Custom));
@@ -916,7 +908,7 @@ void WidgetBoxTreeWidget::dropWidgets(const QList<QDesignerDnDItemInterface*> &i
     WidgetBoxCategoryListView *categoryView = 0;
     bool added = false;
 
-    foreach (QDesignerDnDItemInterface *item, item_list) {
+    for (QDesignerDnDItemInterface *item : item_list) {
         QWidget *w = item->widget();
         if (w == 0)
             continue;

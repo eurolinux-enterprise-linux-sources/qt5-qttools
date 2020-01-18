@@ -1,7 +1,4 @@
 %global qt_module qttools
-%if 0%{?fedora} > 19
-%global system_clucene 1
-%endif
 
 # define to build docs, need to undef this for bootstrapping
 # where qt5-qttools builds are not yet available
@@ -16,22 +13,19 @@
 
 Summary: Qt5 - QtTool components
 Name:    qt5-qttools
-Version: 5.6.2
+Version: 5.9.2
 Release: 1%{?dist}
 
 License: LGPLv3 or LGPLv2
 Url:     http://www.qt.io
-Source0: http://download.qt.io/official_releases/qt/5.6/%{version}/submodules/%{qt_module}-opensource-src-%{version}.tar.xz
-
-Patch1: qttools-opensource-src-5.3.2-system-clucene.patch
+Source0: http://download.qt.io/official_releases/qt/5.9/%{version}/submodules/%{qt_module}-opensource-src-%{version}.tar.xz
 
 # help lrelease/lupdate use/prefer qmake-qt5
 # https://bugzilla.redhat.com/show_bug.cgi?id=1009893
 Patch2: qttools-opensource-src-5.5.0-qmake-qt5.patch
 
-# workaround https://bugreports.qt-project.org/browse/QTBUG-43057
-# 'make docs' crash on el6, use qSort instead of std::sort
-Patch3: qttools-opensource-src-5.6-QTBUG-43057.patch
+# 32-bit MIPS needs explicit -latomic
+Patch4: qttools-opensource-src-5.7-add-libatomic.patch
 
 ## upstream patches
 
@@ -48,10 +42,6 @@ BuildRequires: desktop-file-utils
 BuildRequires: qt5-qtbase-static >= %{version}
 BuildRequires: qt5-qtdeclarative-static >= %{version}
 
-%if 0%{?system_clucene}
-BuildRequires: clucene09-core-devel >= 0.9.21b-12
-%endif
-
 Requires: %{name}-common = %{version}-%{release}
 
 %{?_qt5:Requires: %{_qt5}%{?_isa} >= %{_qt5_version}}
@@ -65,13 +55,13 @@ Obsoletes: qt5-tools < 5.4.0-0.2
 %package common
 Summary: Common files for %{name}
 BuildArch: noarch
+Obsoletes: qt5-qttools-libs-clucene < 5.9.0
 %description common
 %{summary}.
 
 %package devel
 Summary: Development files for %{name}
 Requires: %{name} = %{version}-%{release}
-Requires: %{name}-libs-clucene%{?_isa} = %{version}-%{release}
 Requires: %{name}-libs-designer%{?_isa} = %{version}-%{release}
 Requires: %{name}-libs-designercomponents%{?_isa} = %{version}-%{release}
 Requires: %{name}-libs-help%{?_isa} = %{version}-%{release}
@@ -87,14 +77,6 @@ Requires: qt5-linguist = %{version}-%{release}
 Summary: Static library files for %{name}
 Requires: %{name}-devel%{?_isa} = %{version}-%{release}
 %description static
-%{summary}.
-
-%package libs-clucene
-Summary: Qt5 CLucene runtime library
-Requires: %{name}-common = %{version}-%{release}
-# when split happened
-Conflicts: qt5-tools < 5.4.0-0.2
-%description libs-clucene
 %{summary}.
 
 %package libs-designer
@@ -172,6 +154,20 @@ Conflicts: qt5-qtbase-doc < 5.6.0
 %{summary}.
 %endif
 
+%package -n qt5-doctools
+Summary: Qt5 doc tools package
+Provides: qt5-qdoc = %{version}
+Obsoletes: qt5-qdoc < 5.8.0
+Provides: qt5-qhelpgenerator = %{version}
+Obsoletes: qt5-qhelpgenerator < 5.8.0
+Provides: qt5-qtattributionsscanner = %{version}
+Obsoletes: qt5-qtattributionsscanner < 5.8.0
+Requires: qt5-qtattributionsscanner = %{version}
+
+%description -n qt5-doctools
+%{summary}.
+
+
 %package examples
 Summary: Programming examples for %{name}
 Requires: %{name}-common = %{version}-%{release}
@@ -180,35 +176,28 @@ Requires: %{name}-common = %{version}-%{release}
 
 
 %prep
-%setup -q -n %{qt_module}-opensource-src-%{version}%{?prerelease:-%{prerelease}}
-
-%if 0%{?system_clucene}
-%patch1 -p1 -b .system_clucene
-# bundled libs
-rm -rf src/assistant/3rdparty/clucene
-%endif
+%setup -q -n %{qt_module}-opensource-src-%{version}
 %patch2 -p1 -b .qmake-qt5
-%patch3 -p1 -b .QTBUG-43057
+%ifarch %{mips32}
+%patch4 -p1 -b .libatomic
+%endif
 
 
 %build
-mkdir %{_target_platform}
-pushd %{_target_platform}
-%{qmake_qt5} ..
+%{qmake_qt5}
 
 make %{?_smp_mflags}
 
 %if 0%{?docs}
 make %{?_smp_mflags} docs
 %endif
-popd
 
 
 %install
-make install INSTALL_ROOT=%{buildroot} -C %{_target_platform}
+make install INSTALL_ROOT=%{buildroot}
 
 %if 0%{?docs}
-make install_docs INSTALL_ROOT=%{buildroot} -C %{_target_platform}
+make install_docs INSTALL_ROOT=%{buildroot}
 %endif
 
 # Add desktop files, --vendor=qt4 helps avoid possible conflicts with qt3/qt4
@@ -272,7 +261,7 @@ export PATH=%{buildroot}%{_qt5_bindir}:%{_qt5_bindir}:$PATH
 export LD_LIBRARY_PATH=%{buildroot}%{_qt5_libdir}
 mkdir tests/auto/cmake/%{_target_platform}
 pushd tests/auto/cmake/%{_target_platform}
-cmake .. ||:
+cmake ..
 ctest --output-on-failure ||:
 popd
 %endif
@@ -287,11 +276,6 @@ popd
 
 %files common
 %license LICENSE.LGPL*
-
-%post   libs-clucene -p /sbin/ldconfig
-%postun libs-clucene -p /sbin/ldconfig
-%files  libs-clucene
-%{_qt5_libdir}/libQt5CLucene.so.5*
 
 %post   libs-designer -p /sbin/ldconfig
 %postun libs-designer -p /sbin/ldconfig
@@ -327,6 +311,26 @@ fi
 %{_datadir}/applications/*assistant.desktop
 %{_datadir}/icons/hicolor/*/apps/assistant*.*
 
+%post -n qt5-doctools
+touch --no-create %{_datadir}/icons/hicolor ||:
+
+%posttrans -n qt5-doctools
+gtk-update-icon-cache -q %{_datadir}/icons/hicolor 2> /dev/null ||:
+
+%postun -n qt5-doctools
+if [ $1 -eq 0 ] ; then
+touch --no-create %{_datadir}/icons/hicolor ||:
+gtk-update-icon-cache -q %{_datadir}/icons/hicolor 2> /dev/null ||:
+fi
+
+%files -n qt5-doctools
+%{_bindir}/qdoc*
+%{_qt5_bindir}/qdoc*
+%{_bindir}/qhelpgenerator*
+%{_qt5_bindir}/qhelpgenerator*
+%{_bindir}/qtattributionsscanner
+%{_qt5_bindir}/qtattributionsscanner*
+
 %post -n qt5-designer
 touch --no-create %{_datadir}/icons/hicolor ||:
 
@@ -345,17 +349,15 @@ fi
 %{_qt5_bindir}/designer*
 %{_datadir}/applications/*designer.desktop
 %{_datadir}/icons/hicolor/*/apps/designer*.*
-%dir %{_qt5_libdir}/cmake/Qt5Designer/
-%{_qt5_plugindir}/designer/libqquickwidget.so
-%{_qt5_libdir}/cmake/Qt5Designer/Qt5Designer_QQuickWidgetPlugin.cmake
-%{_qt5_plugindir}/designer/libcontainerextension.so
-%{_qt5_plugindir}/designer/libcustomwidgetplugin.so
-%{_qt5_plugindir}/designer/libtaskmenuextension.so
-%{_qt5_plugindir}/designer/libworldtimeclockplugin.so
-%{_qt5_libdir}/cmake/Qt5Designer/Qt5Designer_AnalogClockPlugin.cmake
-%{_qt5_libdir}/cmake/Qt5Designer/Qt5Designer_MultiPageWidgetPlugin.cmake
-%{_qt5_libdir}/cmake/Qt5Designer/Qt5Designer_TicTacToePlugin.cmake
-%{_qt5_libdir}/cmake/Qt5Designer/Qt5Designer_WorldTimeClockPlugin.cmake
+%{_qt5_plugindir}/designer/*
+%dir %{_qt5_libdir}/cmake/Qt5Designer
+%{_qt5_libdir}/cmake/Qt5Designer/Qt5Designer_*
+
+%if 0%{?webkit}
+%files -n qt5-designer-plugin-webkit
+%{_qt5_plugindir}/designer/libqwebview.so
+%{_qt5_libdir}/cmake/Qt5Designer/Qt5Designer_QWebViewPlugin.cmake
+%endif
 
 %post -n qt5-linguist
 touch --no-create %{_datadir}/icons/hicolor ||:
@@ -407,13 +409,6 @@ fi
 %{_datadir}/applications/*qdbusviewer.desktop
 %{_datadir}/icons/hicolor/*/apps/qdbusviewer*.*
 
-%files -n qt5-qdoc
-%{_bindir}/qdoc*
-%{_qt5_bindir}/qdoc*
-
-%files -n qt5-qhelpgenerator
-%{_bindir}/qhelpgenerator*
-%{_qt5_bindir}/qhelpgenerator*
 
 %files devel
 %{_bindir}/pixeltool*
@@ -426,13 +421,10 @@ fi
 %{_qt5_bindir}/qcollectiongenerator*
 %{_qt5_bindir}/qhelpconverter*
 %{_qt5_bindir}/qtplugininfo*
-%{_qt5_headerdir}/QtCLucene/
 %{_qt5_headerdir}/QtDesigner/
 %{_qt5_headerdir}/QtDesignerComponents/
 %{_qt5_headerdir}/QtHelp/
 %{_qt5_headerdir}/QtUiPlugin
-%{_qt5_libdir}/libQt5CLucene.prl
-%{_qt5_libdir}/libQt5CLucene.so
 %{_qt5_libdir}/libQt5Designer*.prl
 %{_qt5_libdir}/libQt5Designer*.so
 %{_qt5_libdir}/libQt5Help.prl
@@ -443,7 +435,6 @@ fi
 %{_qt5_libdir}/cmake/Qt5UiPlugin/
 %{_qt5_libdir}/pkgconfig/Qt5Designer.pc
 %{_qt5_libdir}/pkgconfig/Qt5Help.pc
-%{_qt5_archdatadir}/mkspecs/modules/qt_lib_clucene_private.pri
 %{_qt5_archdatadir}/mkspecs/modules/qt_lib_designer.pri
 %{_qt5_archdatadir}/mkspecs/modules/qt_lib_designer_private.pri
 %{_qt5_archdatadir}/mkspecs/modules/qt_lib_designercomponents_private.pri
@@ -482,6 +473,18 @@ fi
 
 
 %changelog
+* Fri Oct 06 2017 Jan Grulich <jgrulich@redhat.com> - 5.9.2-1
+- Update to 5.9.2
+  Resolves: bz#1482790
+
+* Mon Sep 04 2017 Jan Grulich <jgrulich@redhat.com> - 5.9.1-2
+- Enable documentation
+  Resolves: bz#1482790
+
+* Wed Aug 23 2017 Jan Grulich <jgrulich@redhat.com> - 5.9.1-1
+- Update to 5.9.1
+  Resolves: bz#1482790
+
 * Wed Jan 11 2017 Jan Grulich <jgrulich@redhat.com> - 5.6.2-1
 - Update to 5.6.2
   Resolves: bz#1384836

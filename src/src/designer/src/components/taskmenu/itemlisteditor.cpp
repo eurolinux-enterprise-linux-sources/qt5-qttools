@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -81,7 +76,7 @@ AbstractItemEditor::AbstractItemEditor(QDesignerFormWindowInterface *form, QWidg
     m_editorFactory = new DesignerEditorFactory(form->core(), this);
     m_editorFactory->setSpacing(0);
     m_propertyBrowser = new ItemPropertyBrowser;
-    m_propertyBrowser->setFactoryForManager((QtVariantPropertyManager *)m_propertyManager,
+    m_propertyBrowser->setFactoryForManager(static_cast<QtVariantPropertyManager *>(m_propertyManager),
                                             m_editorFactory);
 
     connect(m_editorFactory, &DesignerEditorFactory::resetProperty,
@@ -173,7 +168,7 @@ void AbstractItemEditor::propertyChanged(QtProperty *property)
         // Subproperty
         return;
 
-    if ((role == ItemFlagsShadowRole && prop->value().toInt() == (int)QListWidgetItem().flags())
+    if ((role == ItemFlagsShadowRole && prop->value().toInt() == int(QListWidgetItem().flags()))
         || (role == Qt::DecorationPropertyRole && !qvariant_cast<PropertySheetIconValue>(prop->value()).mask())
         || (role == Qt::FontRole && !qvariant_cast<QFont>(prop->value()).resolve())) {
         prop->setModified(false);
@@ -219,9 +214,9 @@ void AbstractItemEditor::resetProperty(QtProperty *property)
     QtVariantProperty *prop = m_propertyManager->variantProperty(property);
     int role = m_propertyToRole.value(prop);
     if (role == ItemFlagsShadowRole)
-        prop->setValue(QVariant::fromValue((int)QListWidgetItem().flags()));
+        prop->setValue(QVariant::fromValue(int(QListWidgetItem().flags())));
     else
-        prop->setValue(QVariant(prop->valueType(), (void *)0));
+        prop->setValue(QVariant(prop->valueType(), nullptr));
     prop->setModified(false);
 
     setItemData(role, QVariant());
@@ -246,14 +241,14 @@ void AbstractItemEditor::cacheReloaded()
 void AbstractItemEditor::updateBrowser()
 {
     BoolBlocker block(m_updatingBrowser);
-    foreach (QtVariantProperty *prop, m_properties) {
+    for (QtVariantProperty *prop : qAsConst(m_properties)) {
         int role = m_propertyToRole.value(prop);
         QVariant val = getItemData(role);
         if (!val.isValid()) {
             if (role == ItemFlagsShadowRole)
-                val = QVariant::fromValue((int)QListWidgetItem().flags());
+                val = QVariant::fromValue(int(QListWidgetItem().flags()));
             else
-                val = QVariant((int)prop->value().userType(), (void *)0);
+                val = QVariant(int(prop->value().userType()), nullptr);
             prop->setModified(false);
         } else {
             prop->setModified(true);
@@ -261,9 +256,10 @@ void AbstractItemEditor::updateBrowser()
         prop->setValue(val);
     }
 
-    if (m_propertyBrowser->topLevelItems().isEmpty())
-        foreach (QtVariantProperty *prop, m_rootProperties)
+    if (m_propertyBrowser->topLevelItems().isEmpty()) {
+        for (QtVariantProperty *prop : qAsConst(m_rootProperties))
             m_propertyBrowser->addProperty(prop);
+    }
 }
 
 void AbstractItemEditor::injectPropertyBrowser(QWidget *parent, QWidget *widget)

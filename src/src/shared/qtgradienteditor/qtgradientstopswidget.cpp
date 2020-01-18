@@ -1,31 +1,37 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the tools applications of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
 ** GNU Lesser General Public License Usage
 ** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** General Public License version 3 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL3 included in the
+** packaging of this file. Please review the following information to
+** ensure the GNU Lesser General Public License version 3 requirements
+** will be met: https://www.gnu.org/licenses/lgpl-3.0.html.
 **
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 2.0 or (at your option) the GNU General
+** Public license version 3 or any later version approved by the KDE Free
+** Qt Foundation. The licenses are as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL2 and LICENSE.GPL3
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-2.0.html and
+** https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -114,7 +120,7 @@ double QtGradientStopsWidgetPrivate::fromViewport(int x) const
     int w = size.width();
     int max = q_ptr->horizontalScrollBar()->maximum();
     int val = q_ptr->horizontalScrollBar()->value();
-    return ((double)x * m_scaleFactor + w * val) / (w * (m_scaleFactor + max));
+    return (double(x) * m_scaleFactor + w * val) / (w * (m_scaleFactor + max));
 }
 
 double QtGradientStopsWidgetPrivate::toViewport(double x) const
@@ -129,10 +135,7 @@ double QtGradientStopsWidgetPrivate::toViewport(double x) const
 QtGradientStop *QtGradientStopsWidgetPrivate::stopAt(const QPoint &viewportPos) const
 {
     double posY = m_handleSize / 2;
-    QListIterator<QtGradientStop *> itStop(m_stops);
-    while (itStop.hasNext()) {
-        QtGradientStop *stop = itStop.next();
-
+    for (QtGradientStop *stop : m_stops) {
         double posX = toViewport(stop->position());
 
         double x = viewportPos.x() - posX;
@@ -148,10 +151,7 @@ QList<QtGradientStop *> QtGradientStopsWidgetPrivate::stopsAt(const QPoint &view
 {
     QList<QtGradientStop *> stops;
     double posY = m_handleSize / 2;
-    QListIterator<QtGradientStop *> itStop(m_stops);
-    while (itStop.hasNext()) {
-        QtGradientStop *stop = itStop.next();
-
+    for (QtGradientStop *stop : m_stops) {
         double posX = toViewport(stop->position());
 
         double x = viewportPos.x() - posX;
@@ -170,11 +170,9 @@ void QtGradientStopsWidgetPrivate::setupMove(QtGradientStop *stop, int x)
     int viewportX = qRound(toViewport(stop->position()));
     m_moveOffset = x - viewportX;
 
-    QList<QtGradientStop *> stops = m_stops;
+    const QList<QtGradientStop *> stops = m_stops;
     m_stops.clear();
-    QListIterator<QtGradientStop *> itStop(stops);
-    while (itStop.hasNext()) {
-        QtGradientStop *s = itStop.next();
+    for (QtGradientStop *s : stops) {
         if (m_model->isSelected(s) || s == stop) {
             m_moveStops[s] = s->position() - stop->position();
             m_stops.append(s);
@@ -182,9 +180,7 @@ void QtGradientStopsWidgetPrivate::setupMove(QtGradientStop *stop, int x)
             m_moveOriginal[s->position()] = s->color();
         }
     }
-    itStop.toFront();
-    while (itStop.hasNext()) {
-        QtGradientStop *s = itStop.next();
+    for (QtGradientStop *s : stops) {
         if (!m_model->isSelected(s))
             m_stops.append(s);
     }
@@ -450,15 +446,13 @@ void QtGradientStopsWidget::setGradientStopsModel(QtGradientStopsModel *model)
         connect(d_ptr->m_model, SIGNAL(currentStopChanged(QtGradientStop*)),
                     this, SLOT(slotCurrentStopChanged(QtGradientStop*)));
 
-        QList<QtGradientStop *> stops = d_ptr->m_model->stops().values();
-        QListIterator<QtGradientStop *> itStop(stops);
-        while (itStop.hasNext())
-            d_ptr->slotStopAdded(itStop.next());
+        const QtGradientStopsModel::PositionStopMap stopsMap = d_ptr->m_model->stops();
+        for (auto it = stopsMap.cbegin(), end = stopsMap.cend(); it != end; ++it)
+            d_ptr->slotStopAdded(it.value());
 
-        QList<QtGradientStop *> selected = d_ptr->m_model->selectedStops();
-        QListIterator<QtGradientStop *> itSelect(selected);
-        while (itSelect.hasNext())
-            d_ptr->slotStopSelected(itSelect.next(), true);
+        const QList<QtGradientStop *> selected = d_ptr->m_model->selectedStops();
+        for (QtGradientStop *stop : selected)
+            d_ptr->slotStopSelected(stop, true);
 
         d_ptr->slotCurrentStopChanged(d_ptr->m_model->currentStop());
     }
@@ -664,9 +658,7 @@ void QtGradientStopsWidget::mouseMoveEvent(QMouseEvent *e)
         double x1 = d_ptr->fromViewport(xv1);
         double x2 = d_ptr->fromViewport(xv2);
 
-        QListIterator<QtGradientStop *> itStop(d_ptr->m_stops);
-        while (itStop.hasNext()) {
-            QtGradientStop *stop = itStop.next();
+        for (QtGradientStop *stop : qAsConst(d_ptr->m_stops)) {
             if ((stop->position() >= x1 && stop->position() <= x2) ||
                         beginList.contains(stop) || endList.contains(stop))
                 d_ptr->m_model->selectStop(stop, true);
@@ -783,21 +775,20 @@ void QtGradientStopsWidget::paintEvent(QPaintEvent *e)
         p.begin(viewport());
     }
 
-    double viewBegin = (double)w * horizontalScrollBar()->value() / d_ptr->m_scaleFactor;
+    const double viewBegin = double(w) * horizontalScrollBar()->value() / d_ptr->m_scaleFactor;
 
     int val = horizontalScrollBar()->value();
     int max = horizontalScrollBar()->maximum();
 
-    double begin = (double)val / (d_ptr->m_scaleFactor + max);
-    double end = (double)(val + d_ptr->m_scaleFactor) / (d_ptr->m_scaleFactor + max);
+    const double begin = double(val) / (d_ptr->m_scaleFactor + max);
+    const double end = double(val + d_ptr->m_scaleFactor) / (d_ptr->m_scaleFactor + max);
     double width = end - begin;
 
     if (h > 0) {
         QLinearGradient lg(0, 0, w, 0);
         QMap<qreal, QtGradientStop *> stops = model->stops();
-        QMapIterator<qreal, QtGradientStop *> itStop(stops);
-        while (itStop.hasNext()) {
-            QtGradientStop *stop = itStop.next().value();
+        for (auto itStop = stops.cbegin(), send = stops.cend(); itStop != send; ++itStop) {
+            QtGradientStop *stop = itStop.value();
             double pos = stop->position();
             if (pos >= begin && pos <= end) {
                 double gradPos = (pos - begin) / width;
@@ -836,10 +827,8 @@ void QtGradientStopsWidget::paintEvent(QPaintEvent *e)
 
     QPen pen;
     p.setRenderHint(QPainter::Antialiasing);
-    QListIterator<QtGradientStop *> itStop(d_ptr->m_stops);
-    itStop.toBack();
-    while (itStop.hasPrevious()) {
-        QtGradientStop *stop = itStop.previous();
+    for (auto rit = d_ptr->m_stops.crbegin(), rend = d_ptr->m_stops.crend(); rit != rend; ++rit) {
+        QtGradientStop *stop = *rit;
         double x = stop->position();
         if (x >= begin - handleWidth / 2 && x <= end + handleWidth / 2) {
             double viewX = x * w * (d_ptr->m_scaleFactor + max) / d_ptr->m_scaleFactor - viewBegin;
@@ -1130,8 +1119,8 @@ void QtGradientStopsWidget::setZoom(double zoom)
     int oldVal = horizontalScrollBar()->value();
     horizontalScrollBar()->setRange(0, qRound(d_ptr->m_scaleFactor * (d_ptr->m_zoom - 1)));
     int newMax = horizontalScrollBar()->maximum();
-    double newVal = (oldVal + (double)d_ptr->m_scaleFactor / 2) * (newMax + d_ptr->m_scaleFactor)
-                / (oldMax + d_ptr->m_scaleFactor) - (double)d_ptr->m_scaleFactor / 2;
+    const double newVal = (oldVal + double(d_ptr->m_scaleFactor) / 2) * (newMax + d_ptr->m_scaleFactor)
+        / (oldMax + d_ptr->m_scaleFactor) - double(d_ptr->m_scaleFactor) / 2;
     horizontalScrollBar()->setValue(qRound(newVal));
     viewport()->update();
 }

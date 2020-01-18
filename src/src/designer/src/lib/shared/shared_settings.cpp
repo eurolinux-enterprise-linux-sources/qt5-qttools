@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Designer of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -35,6 +30,8 @@
 #include "grid_p.h"
 #include "previewmanager_p.h"
 #include "qdesigner_utils_p.h"
+
+#include <actioneditor_p.h>
 
 #include <QtDesigner/QDesignerFormEditorInterface>
 #include <QtDesigner/QDesignerSettingsInterface>
@@ -59,6 +56,9 @@ static const char *deviceProfilesKey = "DeviceProfiles";
 static const char *formTemplatePathsKey = "FormTemplatePaths";
 static const char *formTemplateKey = "FormTemplate";
 static const char *newFormSizeKey = "NewFormSize";
+static inline QString namingModeKey() { return QStringLiteral("naming"); }
+static inline QString underScoreNamingMode() { return QStringLiteral("underscore"); }
+static inline QString camelCaseNamingMode() { return QStringLiteral("camelcase"); }
 
 using namespace qdesigner_internal;
 
@@ -155,7 +155,7 @@ QStringList QDesignerSharedSettings::additionalFormTemplatePaths() const
 {
     // get template paths excluding internal ones
     QStringList rc = formTemplatePaths();
-    foreach (const QString &internalTemplatePath, defaultFormTemplatePaths()) {
+    for (const QString &internalTemplatePath : defaultFormTemplatePaths()) {
         const int index = rc.indexOf(internalTemplatePath);
         if (index != -1)
             rc.removeAt(index);
@@ -229,6 +229,20 @@ int QDesignerSharedSettings::zoom() const
 void QDesignerSharedSettings::setZoom(int z)
 {
     m_settings->setValue(QLatin1String(zoomKey), QVariant(z));
+}
+
+ObjectNamingMode QDesignerSharedSettings::objectNamingMode() const
+{
+    const QString value = m_settings->value(namingModeKey()).toString();
+    return value == camelCaseNamingMode()
+        ? qdesigner_internal::CamelCase : qdesigner_internal::Underscore;
+}
+
+void QDesignerSharedSettings::setObjectNamingMode(ObjectNamingMode n)
+{
+    const QString value = n == qdesigner_internal::CamelCase
+        ? camelCaseNamingMode() : underScoreNamingMode();
+    m_settings->setValue(namingModeKey(), QVariant(value));
 }
 
 bool QDesignerSharedSettings::zoomEnabled() const

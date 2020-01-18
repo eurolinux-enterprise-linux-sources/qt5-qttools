@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Assistant of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -46,8 +41,6 @@
 
 #include <QtHelp/QHelpEngine>
 #include <QtHelp/QHelpSearchEngine>
-
-#include <QtNetwork/QLocalSocket>
 
 #include <QtSql/QSqlDatabase>
 
@@ -97,7 +90,7 @@ void stripNonexistingDocs(QHelpEngineCore& collection)
 {
     TRACE_OBJ
     const QStringList &namespaces = collection.registeredDocumentations();
-    foreach (const QString &ns, namespaces) {
+    for (const QString &ns : namespaces) {
         QFileInfo fi(collection.documentationFileName(ns));
         if (!fi.exists() || !fi.isFile())
             collection.unregisterDocumentation(ns);
@@ -153,7 +146,7 @@ bool synchronizeDocs(QHelpEngineCore &collection,
      * Ensure that the cached collection contains all docs that
      * the collection contains.
      */
-    foreach (const QString &doc, docs) {
+    for (const QString &doc : docs) {
         if (!cachedDocs.contains(doc)) {
             const QString &docFile = collection.documentationFileName(doc);
             if (!cachedCollection.registerDocumentation(docFile)) {
@@ -176,36 +169,14 @@ bool removeSearchIndex(const QString &collectionFile)
     QString path = QFileInfo(collectionFile).path();
     path += QLatin1Char('/') + indexFilesFolder(collectionFile);
 
-    QLocalSocket localSocket;
-    localSocket.connectToServer(QString(QLatin1String("QtAssistant%1"))
-                                .arg(QLatin1String(QT_VERSION_STR)));
-
-    QDir dir(path); // check if there is no other instance ruinning
-    if (!dir.exists() || localSocket.waitForConnected())
+    QDir dir(path);
+    if (!dir.exists())
         return false;
 
-    QStringList lst = dir.entryList(QDir::Files | QDir::Hidden);
-    foreach (const QString &item, lst)
+    const QStringList &list = dir.entryList(QDir::Files | QDir::Hidden);
+    for (const QString &item : list)
         dir.remove(item);
     return true;
-}
-
-bool rebuildSearchIndex(QCoreApplication *app, const QString &collectionFile,
-                        CmdLineParser &cmd)
-{
-    TRACE_OBJ
-    QHelpEngine engine(collectionFile);
-    if (!engine.setupData()) {
-        cmd.showMessage(QCoreApplication::translate("Assistant", "Error: %1")
-                        .arg(engine.error()), true);
-        return false;
-    }
-
-    QHelpSearchEngine * const searchEngine = engine.searchEngine();
-    QObject::connect(searchEngine, SIGNAL(indexingFinished()), app,
-                     SLOT(quit()));
-    searchEngine->reindexDocumentation();
-    return app->exec() == 0;
 }
 
 QCoreApplication* createApplication(int &argc, char *argv[])
@@ -224,7 +195,10 @@ QCoreApplication* createApplication(int &argc, char *argv[])
         }
     }
 #endif
-    return new QApplication(argc, argv);
+    QApplication *app = new QApplication(argc, argv);
+    app->connect(app, &QGuiApplication::lastWindowClosed,
+                 &QCoreApplication::quit);
+    return app;
 }
 
 bool registerDocumentation(QHelpEngineCore &collection, CmdLineParser &cmd,
@@ -393,11 +367,6 @@ int main(int argc, char *argv[])
             ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 
-    if (cmd.rebuildSearchIndex()) {
-        return rebuildSearchIndex(a.data(), cachedCollectionFile, cmd)
-            ? EXIT_SUCCESS : EXIT_FAILURE;
-    }
-
     if (!QSqlDatabase::isDriverAvailable(QLatin1String("QSQLITE"))) {
         cmd.showMessage(QCoreApplication::translate("Assistant",
                             "Cannot load sqlite database driver!"),
@@ -416,7 +385,6 @@ int main(int argc, char *argv[])
 
     MainWindow *w = new MainWindow(&cmd);
     w->show();
-    a->connect(a.data(), SIGNAL(lastWindowClosed()), a.data(), SLOT(quit()));
 
     /*
      * We need to be careful here: The main window has to be deleted before

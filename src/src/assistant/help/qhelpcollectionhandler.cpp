@@ -1,31 +1,37 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Assistant of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:LGPL$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
 ** GNU Lesser General Public License Usage
 ** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** General Public License version 3 as published by the Free Software
+** Foundation and appearing in the file LICENSE.LGPL3 included in the
+** packaging of this file. Please review the following information to
+** ensure the GNU Lesser General Public License version 3 requirements
+** will be met: https://www.gnu.org/licenses/lgpl-3.0.html.
 **
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 2.0 or (at your option) the GNU General
+** Public license version 3 or any later version approved by the KDE Free
+** Qt Foundation. The licenses are as published by the Free Software
+** Foundation and appearing in the file LICENSE.GPL2 and LICENSE.GPL3
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-2.0.html and
+** https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -49,12 +55,10 @@ QHelpCollectionHandler::QHelpCollectionHandler(const QString &collectionFile, QO
     : QObject(parent)
     , m_dbOpened(false)
     , m_collectionFile(collectionFile)
-    , m_connectionName(QString())
 {
-    QFileInfo fi(m_collectionFile);
+    const QFileInfo fi(m_collectionFile);
     if (!fi.isAbsolute())
         m_collectionFile = fi.absoluteFilePath();
-    m_query.clear();
 }
 
 QHelpCollectionHandler::~QHelpCollectionHandler()
@@ -128,7 +132,7 @@ bool QHelpCollectionHandler::copyCollectionFile(const QString &fileName)
     if (!m_dbOpened)
         return false;
 
-    QFileInfo fi(fileName);
+    const QFileInfo fi(fileName);
     if (fi.exists()) {
         emit error(tr("The collection file '%1' already exists.").
                    arg(fileName));
@@ -140,9 +144,9 @@ bool QHelpCollectionHandler::copyCollectionFile(const QString &fileName)
         return false;
     }
 
-    QString colFile = fi.absoluteFilePath();
-    QString connectionName = QHelpGlobal::uniquifyConnectionName(
-        QLatin1String("QHelpCollectionHandlerCopy"), this);
+    const QString &colFile = fi.absoluteFilePath();
+    const QString &connectionName = QHelpGlobal::uniquifyConnectionName(
+                QLatin1String("QHelpCollectionHandlerCopy"), this);
     QSqlQuery *copyQuery = 0;
     bool openingOk = true;
     {
@@ -166,14 +170,13 @@ bool QHelpCollectionHandler::copyCollectionFile(const QString &fileName)
         return false;
     }
 
-    QString oldBaseDir = QFileInfo(collectionFile()).absolutePath();
-    QString oldFilePath;
-    QFileInfo newColFi(colFile);
+    const QString &oldBaseDir = QFileInfo(collectionFile()).absolutePath();
+    const QFileInfo newColFi(colFile);
     m_query.exec(QLatin1String("SELECT Name, FilePath FROM NamespaceTable"));
     while (m_query.next()) {
         copyQuery->prepare(QLatin1String("INSERT INTO NamespaceTable VALUES(NULL, ?, ?)"));
         copyQuery->bindValue(0, m_query.value(0).toString());
-        oldFilePath = m_query.value(1).toString();
+        QString oldFilePath = m_query.value(1).toString();
         if (!QDir::isAbsolutePath(oldFilePath))
             oldFilePath = oldBaseDir + QDir::separator() + oldFilePath;
         copyQuery->bindValue(1, newColFi.absoluteDir().relativeFilePath(oldFilePath));
@@ -212,7 +215,7 @@ bool QHelpCollectionHandler::copyCollectionFile(const QString &fileName)
 
     m_query.exec(QLatin1String("SELECT Key, Value FROM SettingsTable"));
     while (m_query.next()) {
-        if (m_query.value(0).toString() == QLatin1String("CluceneSearchNamespaces"))
+        if (m_query.value(0).toString() == QLatin1String("FTS5IndexedNamespaces"))
             continue;
         copyQuery->prepare(QLatin1String("INSERT INTO SettingsTable VALUES(?, ?)"));
         copyQuery->bindValue(0, m_query.value(0).toString());
@@ -228,29 +231,29 @@ bool QHelpCollectionHandler::copyCollectionFile(const QString &fileName)
 
 bool QHelpCollectionHandler::createTables(QSqlQuery *query)
 {
-    QStringList tables;
-    tables << QLatin1String("CREATE TABLE NamespaceTable ("
-        "Id INTEGER PRIMARY KEY, "
-        "Name TEXT, "
-        "FilePath TEXT )")
-        << QLatin1String("CREATE TABLE FolderTable ("
-        "Id INTEGER PRIMARY KEY, "
-        "NamespaceId INTEGER, "
-        "Name TEXT )")
-        << QLatin1String("CREATE TABLE FilterAttributeTable ("
-        "Id INTEGER PRIMARY KEY, "
-        "Name TEXT )")
-        << QLatin1String("CREATE TABLE FilterNameTable ("
-        "Id INTEGER PRIMARY KEY, "
-        "Name TEXT )")
-        << QLatin1String("CREATE TABLE FilterTable ("
-        "NameId INTEGER, "
-        "FilterAttributeId INTEGER )")
-        << QLatin1String("CREATE TABLE SettingsTable ("
-        "Key TEXT PRIMARY KEY, "
-        "Value BLOB )");
+    const QStringList tables = QStringList()
+            << QLatin1String("CREATE TABLE NamespaceTable ("
+                             "Id INTEGER PRIMARY KEY, "
+                             "Name TEXT, "
+                             "FilePath TEXT )")
+            << QLatin1String("CREATE TABLE FolderTable ("
+                             "Id INTEGER PRIMARY KEY, "
+                             "NamespaceId INTEGER, "
+                             "Name TEXT )")
+            << QLatin1String("CREATE TABLE FilterAttributeTable ("
+                             "Id INTEGER PRIMARY KEY, "
+                             "Name TEXT )")
+            << QLatin1String("CREATE TABLE FilterNameTable ("
+                             "Id INTEGER PRIMARY KEY, "
+                             "Name TEXT )")
+            << QLatin1String("CREATE TABLE FilterTable ("
+                             "NameId INTEGER, "
+                             "FilterAttributeId INTEGER )")
+            << QLatin1String("CREATE TABLE SettingsTable ("
+                             "Key TEXT PRIMARY KEY, "
+                             "Value BLOB )");
 
-    foreach (const QString &q, tables) {
+    for (const QString &q : tables) {
         if (!query->exec(q))
             return false;
     }
@@ -319,7 +322,7 @@ bool QHelpCollectionHandler::addCustomFilter(const QString &filterName,
             idsToInsert.removeAll(m_query.value(1).toString());
     }
 
-    foreach (const QString &id, idsToInsert) {
+    for (const QString &id : qAsConst(idsToInsert)) {
         m_query.prepare(QLatin1String("INSERT INTO FilterAttributeTable VALUES(NULL, ?)"));
         m_query.bindValue(0, id);
         m_query.exec();
@@ -342,7 +345,7 @@ bool QHelpCollectionHandler::addCustomFilter(const QString &filterName,
     m_query.bindValue(0, nameId);
     m_query.exec();
 
-    foreach (const QString &att, attributes) {
+    for (const QString &att : attributes) {
         m_query.prepare(QLatin1String("INSERT INTO FilterTable VALUES(?, ?)"));
         m_query.bindValue(0, nameId);
         m_query.bindValue(1, attributeMap[att]);
@@ -382,13 +385,13 @@ bool QHelpCollectionHandler::registerDocumentation(const QString &fileName)
         return false;
     }
 
-    QString ns = reader.namespaceName();
+    const QString &ns = reader.namespaceName();
     if (ns.isEmpty()) {
         emit error(tr("Invalid documentation file '%1'.").arg(fileName));
         return false;
     }
 
-    int nsId = registerNamespace(ns, fileName);
+    const int nsId = registerNamespace(ns, fileName);
     if (nsId < 1)
         return false;
 
@@ -396,7 +399,7 @@ bool QHelpCollectionHandler::registerDocumentation(const QString &fileName)
         return false;
 
     addFilterAttributes(reader.filterAttributes());
-    foreach (const QString &filterName, reader.customFilters())
+    for (const QString &filterName : reader.customFilters())
         addCustomFilter(filterName, reader.filterAttributes(filterName));
 
     optimizeDatabase(fileName);
@@ -413,14 +416,12 @@ bool QHelpCollectionHandler::unregisterDocumentation(const QString &namespaceNam
     m_query.bindValue(0, namespaceName);
     m_query.exec();
 
-    int nsId = -1;
-    if (m_query.next())
-        nsId = m_query.value(0).toInt();
-
-    if (nsId < 0) {
+    if (!m_query.next()) {
         emit error(tr("The namespace %1 was not registered.").arg(namespaceName));
         return false;
     }
+
+    const int nsId = m_query.value(0).toInt();
 
     m_query.prepare(QLatin1String("DELETE FROM NamespaceTable WHERE Id=?"));
     m_query.bindValue(0, nsId);
@@ -444,23 +445,26 @@ bool QHelpCollectionHandler::removeCustomValue(const QString &key)
 QVariant QHelpCollectionHandler::customValue(const QString &key,
                                              const QVariant &defaultValue) const
 {
-    QVariant value = defaultValue;
-    if (m_dbOpened) {
-        m_query.prepare(QLatin1String("SELECT COUNT(Key) FROM SettingsTable WHERE Key=?"));
-        m_query.bindValue(0, key);
-        if (!m_query.exec() || !m_query.next() || !m_query.value(0).toInt()) {
-            m_query.clear();
-            return defaultValue;
-        }
+    if (!m_dbOpened)
+        return defaultValue;
 
+    m_query.prepare(QLatin1String("SELECT COUNT(Key) FROM SettingsTable WHERE Key=?"));
+    m_query.bindValue(0, key);
+    if (!m_query.exec() || !m_query.next() || !m_query.value(0).toInt()) {
         m_query.clear();
-        m_query.prepare(QLatin1String("SELECT Value FROM SettingsTable WHERE Key=?"));
-        m_query.bindValue(0, key);
-        if (m_query.exec() && m_query.next())
-            value = m_query.value(0);
-        m_query.clear();
+        return defaultValue;
     }
-    return value;
+
+    m_query.clear();
+    m_query.prepare(QLatin1String("SELECT Value FROM SettingsTable WHERE Key=?"));
+    m_query.bindValue(0, key);
+    if (m_query.exec() && m_query.next()) {
+        const QVariant &value = m_query.value(0);
+        m_query.clear();
+        return value;
+    }
+
+    return defaultValue;
 }
 
 bool QHelpCollectionHandler::setCustomValue(const QString &key,
@@ -476,8 +480,7 @@ bool QHelpCollectionHandler::setCustomValue(const QString &key,
         m_query.prepare(QLatin1String("UPDATE SettingsTable SET Value=? where Key=?"));
         m_query.bindValue(0, value);
         m_query.bindValue(1, key);
-    }
-    else {
+    } else {
         m_query.prepare(QLatin1String("INSERT INTO SettingsTable VALUES(?, ?)"));
         m_query.bindValue(0, key);
         m_query.bindValue(1, value);
@@ -495,7 +498,7 @@ bool QHelpCollectionHandler::addFilterAttributes(const QStringList &attributes)
     while (m_query.next())
         atts.insert(m_query.value(0).toString());
 
-    foreach (const QString &s, attributes) {
+    for (const QString &s : attributes) {
         if (!atts.contains(s)) {
             m_query.prepare(QLatin1String("INSERT INTO FilterAttributeTable VALUES(NULL, ?)"));
             m_query.bindValue(0, s);
@@ -579,7 +582,6 @@ void QHelpCollectionHandler::optimizeDatabase(const QString &fileName)
             return;
         }
 
-        QSqlQuery query(db);
         db.exec(QLatin1String("PRAGMA synchronous=OFF"));
         db.exec(QLatin1String("PRAGMA cache_size=3000"));
         db.exec(QLatin1String("CREATE INDEX IF NOT EXISTS NameIndex ON IndexTable(Name)"));

@@ -1,31 +1,26 @@
 /****************************************************************************
 **
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
+** Copyright (C) 2016 The Qt Company Ltd.
+** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Assistant of the Qt Toolkit.
 **
-** $QT_BEGIN_LICENSE:LGPL21$
+** $QT_BEGIN_LICENSE:GPL-EXCEPT$
 ** Commercial License Usage
 ** Licensees holding valid commercial Qt licenses may use this file in
 ** accordance with the commercial license agreement provided with the
 ** Software or, alternatively, in accordance with the terms contained in
 ** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
+** and conditions see https://www.qt.io/terms-conditions. For further
+** information use the contact form at https://www.qt.io/contact-us.
 **
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+** GNU General Public License Usage
+** Alternatively, this file may be used under the terms of the GNU
+** General Public License version 3 as published by the Free Software
+** Foundation with exceptions as appearing in the file LICENSE.GPL3-EXCEPT
+** included in the packaging of this file. Please review the following
+** information to ensure the GNU General Public License requirements will
+** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
 ** $QT_END_LICENSE$
 **
@@ -98,10 +93,10 @@ void QhpWriter::writeCustomFilters()
     if (!m_customFilters.count())
         return;
 
-    foreach (const CustomFilter &f, m_customFilters) {
+    for (const CustomFilter &f : qAsConst(m_customFilters)) {
         writeStartElement(QLatin1String("customFilter"));
         writeAttribute(QLatin1String("name"), f.name);
-        foreach (const QString &a, f.filterAttributes)
+        for (const QString &a : f.filterAttributes)
             writeTextElement(QLatin1String("filterAttribute"), a);
         writeEndElement();
     }
@@ -110,7 +105,7 @@ void QhpWriter::writeCustomFilters()
 void QhpWriter::writeFilterSection()
 {
     writeStartElement(QLatin1String("filterSection"));
-    foreach (const QString &a, m_filterAttributes)
+    for (const QString &a : qAsConst(m_filterAttributes))
         writeTextElement(QLatin1String("filterAttribute"), a);
 
     writeToc();
@@ -121,13 +116,13 @@ void QhpWriter::writeFilterSection()
 
 void QhpWriter::writeToc()
 {
-    QList<ContentItem> lst = m_adpReader->contents();
-    if (lst.isEmpty())
+    const QList<ContentItem> &list = m_adpReader->contents();
+    if (list.isEmpty())
         return;
 
     int depth = -1;
     writeStartElement(QLatin1String("toc"));
-    foreach (const ContentItem &i, lst) {
+    for (const ContentItem &i : list) {
         while (depth-- >= i.depth)
             writeEndElement();
         writeStartElement(QLatin1String("section"));
@@ -141,18 +136,18 @@ void QhpWriter::writeToc()
 
 void QhpWriter::writeKeywords()
 {
-    QList<KeywordItem> lst = m_adpReader->keywords();
-    if (lst.isEmpty())
+    const QList<KeywordItem> &list = m_adpReader->keywords();
+    if (list.isEmpty())
         return;
 
     writeStartElement(QLatin1String("keywords"));
-    foreach (const KeywordItem &i, lst) {
+    for (const KeywordItem &i : list) {
         writeEmptyElement(QLatin1String("keyword"));
         writeAttribute(QLatin1String("name"), i.keyword);
         writeAttribute(QLatin1String("ref"), i.reference);
         if (m_prefix == FilePrefix) {
             QString str = i.reference.mid(
-                i.reference.lastIndexOf(QLatin1Char('/'))+1);
+                i.reference.lastIndexOf(QLatin1Char('/')) + 1);
             str = str.left(str.lastIndexOf(QLatin1Char('.')));
             writeAttribute(QLatin1String("id"), str + QLatin1String("::") + i.keyword);
         } else if (m_prefix == GlobalPrefix) {
@@ -168,7 +163,7 @@ void QhpWriter::writeFiles()
         return;
 
     writeStartElement(QLatin1String("files"));
-    foreach (const QString &f, m_files)
+    for (const QString &f : qAsConst(m_files))
         writeTextElement(QLatin1String("file"), f);
     writeEndElement();
 }
