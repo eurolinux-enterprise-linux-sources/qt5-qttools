@@ -1167,6 +1167,15 @@ void deployQmlImport(const QString &appBundlePath, const QSet<QString> &rpaths, 
     recursiveCopyAndDeploy(appBundlePath, rpaths, importSourcePath, importDestinationPath);
 }
 
+static bool importLessThan(const QVariant &v1, const QVariant &v2)
+{
+    QVariantMap import1 = v1.toMap();
+    QVariantMap import2 = v2.toMap();
+    QString path1 = import1["path"].toString();
+    QString path2 = import2["path"].toString();
+    return path1 < path2;
+}
+
 // Scan qml files in qmldirs for import statements, deploy used imports from Qml2ImportsPath to Contents/Resources/qml.
 bool deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInfo, QStringList &qmlDirs)
 {
@@ -1228,12 +1237,15 @@ bool deployQmlImports(const QString &appBundlePath, DeploymentInfo deploymentInf
 
     bool qtQuickContolsInUse = false; // condition for QtQuick.PrivateWidgets below
 
-    // deploy each import
-    foreach (const QJsonValue &importValue, doc.array()) {
-        if (!importValue.isObject())
-            continue;
+    // sort imports to deploy a module before its sub-modules (otherwise
+    // deployQmlImports can consider the module deployed if it has already
+    // deployed one of its sub-module)
+    QVariantList array = doc.array().toVariantList();
+    qSort(array.begin(), array.end(), importLessThan);
 
-        QJsonObject import = importValue.toObject();
+    // deploy each import
+    foreach (const QVariant &importValue, array) {
+        QVariantMap import = importValue.toMap();
         QString name = import["name"].toString();
         QString path = import["path"].toString();
         QString type = import["type"].toString();
@@ -1481,7 +1493,7 @@ void codesign(const QString &identity, const QString &appBundlePath) {
     codesignBundle(identity, appBundlePath, QList<QString>());
 }
 
-void createDiskImage(const QString &appBundlePath)
+void createDiskImage(const QString &appBundlePath, const QString &filesystemType)
 {
     QString appBaseName = appBundlePath;
     appBaseName.chop(4); // remove ".app" from end
@@ -1499,16 +1511,22 @@ void createDiskImage(const QString &appBundlePath)
         LogNormal() << "Creating disk image (.dmg) for" << appBundlePath;
     }
 
+    LogNormal() << "Image will use" << filesystemType;
+
     // More dmg options can be found in the hdiutil man page.
     QStringList options = QStringList()
             << "create" << dmgName
             << "-srcfolder" << appBundlePath
             << "-format" << "UDZO"
+            << "-fs" << filesystemType
             << "-volname" << appBaseName;
 
     QProcess hdutil;
     hdutil.start("hdiutil", options);
     hdutil.waitForFinished(-1);
+    if (hdutil.exitCode() != 0) {
+        LogError() << "Bundle creation error:" << hdutil.readAllStandardError();
+    }
 }
 
 void fixupFramework(const QString &frameworkName)

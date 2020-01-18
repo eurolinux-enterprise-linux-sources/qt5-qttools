@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 The Qt Company Ltd.
+** Copyright (C) 2017 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the examples of the Qt Toolkit.
@@ -51,7 +51,8 @@
 #ifndef ASSISTANT_H
 #define ASSISTANT_H
 
-#include <QtCore/QString>
+#include <QCoreApplication>
+#include <QString>
 
 QT_BEGIN_NAMESPACE
 class QProcess;
@@ -59,6 +60,8 @@ QT_END_NAMESPACE
 
 class Assistant
 {
+    Q_DECLARE_TR_FUNCTIONS(Assistant)
+
 public:
     Assistant();
     ~Assistant();

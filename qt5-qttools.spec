@@ -13,7 +13,7 @@
 
 Summary: Qt5 - QtTool components
 Name:    qt5-qttools
-Version: 5.9.2
+Version: 5.9.7
 Release: 1%{?dist}
 
 License: LGPLv3 or LGPLv2
@@ -473,6 +473,10 @@ fi
 
 
 %changelog
+* Thu Feb 07 2019 Jan Grulich <jgrulich@redhat.com> - 5.9.7-1
+- Update to 5.9.7
+  Resolves: bz#1564017
+
 * Fri Oct 06 2017 Jan Grulich <jgrulich@redhat.com> - 5.9.2-1
 - Update to 5.9.2
   Resolves: bz#1482790
