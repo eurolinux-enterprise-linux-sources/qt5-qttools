@@ -14,16 +14,14 @@
 %endif
 %endif
 
-#define prerelease
-
 Summary: Qt5 - QtTool components
 Name:    qt5-qttools
-Version: 5.6.1
-Release: 10%{?prerelease:.%{prerelease}}%{?dist}
+Version: 5.6.2
+Release: 1%{?dist}
 
 License: LGPLv3 or LGPLv2
 Url:     http://www.qt.io
-Source0: http://download.qt.io/snapshots/qt/5.6/%{version}%{?prerelease:-%{prerelease}}/submodules/%{qt_module}-opensource-src-%{version}%{?prerelease:-%{prerelease}}.tar.xz
+Source0: http://download.qt.io/official_releases/qt/5.6/%{version}/submodules/%{qt_module}-opensource-src-%{version}.tar.xz
 
 Patch1: qttools-opensource-src-5.3.2-system-clucene.patch
 
@@ -274,7 +272,7 @@ export PATH=%{buildroot}%{_qt5_bindir}:%{_qt5_bindir}:$PATH
 export LD_LIBRARY_PATH=%{buildroot}%{_qt5_libdir}
 mkdir tests/auto/cmake/%{_target_platform}
 pushd tests/auto/cmake/%{_target_platform}
-cmake ..
+cmake .. ||:
 ctest --output-on-failure ||:
 popd
 %endif
@@ -445,7 +443,13 @@ fi
 %{_qt5_libdir}/cmake/Qt5UiPlugin/
 %{_qt5_libdir}/pkgconfig/Qt5Designer.pc
 %{_qt5_libdir}/pkgconfig/Qt5Help.pc
-%{_qt5_archdatadir}/mkspecs/modules/*.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_clucene_private.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_designer.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_designer_private.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_designercomponents_private.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_help.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_help_private.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_uiplugin.pri
 
 %files static
 %{_qt5_headerdir}/QtUiTools/
@@ -453,6 +457,8 @@ fi
 %{_qt5_libdir}/libQt5UiTools.prl
 %{_qt5_libdir}/cmake/Qt5UiTools/
 %{_qt5_libdir}/pkgconfig/Qt5UiTools.pc
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_uitools.pri
+%{_qt5_archdatadir}/mkspecs/modules/qt_lib_uitools_private.pri
 
 %if 0%{?docs}
 %files doc
@@ -476,6 +482,10 @@ fi
 
 
 %changelog
+* Wed Jan 11 2017 Jan Grulich <jgrulich@redhat.com> - 5.6.2-1
+- Update to 5.6.2
+  Resolves: bz#1384836
+
 * Tue Aug 30 2016 Jan Grulich <jgrulich@redhat.com> - 5.6.1-10
 - Increase build version to have newer version than in EPEL
   Resolves: bz#1317413
